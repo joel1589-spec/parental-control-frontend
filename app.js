@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://john-dbfu.onrender.com';   // L’URL de votre backend Render
 let adminToken = null;
 let currentChildId = null;
 let currentTab = 'dashboard';
