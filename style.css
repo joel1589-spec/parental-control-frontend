@@ -800,60 +800,97 @@ canvas {
     display: block;
 }
 
-/* Responsive */
+/* ============ RESPONSIVE ============ */
+
+/* Pour les tablettes et petits écrans */
 @media (max-width: 1024px) {
     .sidebar {
         width: 80px;
     }
-    
     .sidebar-header span:last-child,
     .nav-item span:last-child,
     .sidebar-footer span:last-child {
         display: none;
     }
-    
     .main-content {
         margin-left: 80px;
         padding: 24px;
         width: calc(100% - 80px);
     }
-    
     .nav-item {
         justify-content: center;
         padding: 14px;
     }
-    
     .logout-btn-sidebar {
         justify-content: center;
     }
 }
 
+/* Pour les smartphones */
 @media (max-width: 768px) {
     .stats-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
-    
     .top-bar {
         flex-direction: column;
         align-items: flex-start;
+        gap: 16px;
     }
-    
     .top-bar-actions {
         width: 100%;
+        flex-wrap: wrap;
     }
-    
-    .child-selector-wrapper select {
-        flex: 1;
+    .child-selector-wrapper select,
+    .top-bar-actions .btn-primary {
+        width: 100%;
     }
-    
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
     .child-card {
         flex-direction: column;
         align-items: flex-start;
     }
-    
     .child-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+    .rule-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .rule-info {
+        margin-bottom: 8px;
+    }
+    .conversation-header {
+        flex-wrap: wrap;
+    }
+    .modal-content {
+        width: 95%;
+        margin: 40px auto;
+    }
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+
+/* Ajustement des polices pour mobile */
+@media (max-width: 480px) {
+    body {
+        font-size: 14px;
+    }
+    .page-title h2 {
+        font-size: 22px;
+    }
+    .stat-card p {
+        font-size: 24px;
+    }
+    .btn-primary, .btn-secondary {
+        padding: 10px 16px;
     }
 }
 
