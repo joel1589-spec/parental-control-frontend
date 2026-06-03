@@ -1,4 +1,4 @@
-const API_URL = 'https://john-dbfu.onrender.com';   // L’URL de votre backend Render
+const API_URL = 'https://john-dbfu.onrender.com';  // Remplacez par l'URL de votre backend Render
 let adminToken = null;
 let currentChildId = null;
 let currentTab = 'dashboard';
@@ -164,7 +164,7 @@ function initChart() {
     screenTimeChart = new Chart(ctx, {
         type: 'bar',
         data: { labels: realScreenTimeData.labels, datasets: [{ label: "Temps d'écran (heures)", data: realScreenTimeData.daily, backgroundColor: 'rgba(102,126,234,0.7)' }] },
-        options: { responsive: true, plugins: { legend: { labels: { color: '#e5e7eb' } } }, scales: { y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } }, x: { ticks: { color: '#9ca3af' } } } }
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#e5e7eb' } } }, scales: { y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } }, x: { ticks: { color: '#9ca3af' } } } }
     });
 }
 
@@ -320,7 +320,7 @@ function showToast(msg, type='info') {
     setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease'; setTimeout(()=>toast.remove(),300); }, 3000);
 }
 
-// Modals pour ajouter enfant
+// Modals
 function showAddChildModal() { document.getElementById('addChildModal').style.display = 'flex'; }
 function closeAddChildModal() { document.getElementById('addChildModal').style.display = 'none'; document.getElementById('childDeviceName').value = ''; }
 async function generatePairingCode(e) {
@@ -342,8 +342,7 @@ async function generatePairingCode(e) {
 function closePairingCodeModal() { document.getElementById('pairingCodeModal').style.display = 'none'; }
 function copyPairingCode() { navigator.clipboard.writeText(document.getElementById('pairingCodeDisplay').textContent); showToast('✅ Code copié','success'); }
 
-// ============ RÈGLES DE BLOCAGE (CRUD complet) ============
-
+// Règles
 async function loadRules() {
     const container = document.getElementById('rulesList');
     if (!currentChildId) {
@@ -351,9 +350,7 @@ async function loadRules() {
         return;
     }
     try {
-        const res = await fetch(`${API_URL}/api/admin/rules/${currentChildId}`, {
-            headers: { Authorization: `Bearer ${adminToken}` }
-        });
+        const res = await fetch(`${API_URL}/api/admin/rules/${currentChildId}`, { headers: { Authorization: `Bearer ${adminToken}` } });
         const data = await res.json();
         const rules = data.rules || [];
         if (!rules.length) {
@@ -464,7 +461,7 @@ async function deleteRule(ruleId) {
     }
 }
 
-// ============ NOTIFICATIONS avec regroupement par contact ============
+// Notifications avec regroupement
 async function loadNotifications() {
     const container = document.getElementById('notificationsList');
     if (!currentChildId) {
@@ -550,7 +547,6 @@ async function markAsRead(notifId) {
     } catch (error) { console.error(error); }
 }
 
-// Fonction pour afficher/masquer les messages d'une conversation
 window.toggleConversation = function(contact) {
     const idSafe = 'conv-' + contact.replace(/[^a-zA-Z0-9]/g, '_');
     const el = document.getElementById(idSafe);
@@ -566,6 +562,10 @@ window.toggleConversation = function(contact) {
         }
     }
 };
+
+async function refreshTopApps() {
+    await loadTopApps();
+}
 
 // ============ CHARGEMENT INITIAL ============
 async function loadAllData() {
@@ -598,7 +598,7 @@ window.onload = () => {
     }
 };
 
-// Rendre les fonctions globales pour les boutons HTML
+// Rendre les fonctions globales
 window.login = login;
 window.logout = logout;
 window.switchTab = switchTab;

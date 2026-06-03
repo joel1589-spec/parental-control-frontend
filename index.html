@@ -2,8 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Parental Control Pro - Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -33,15 +32,16 @@
 
         <!-- Dashboard principal -->
         <div id="dashboardScreen" class="screen">
-            <!-- Sidebar -->
-            <div class="sidebar">
+            <!-- Sidebar (mobile : transformée en menu hamburger) -->
+            <div class="sidebar" id="sidebar">
                 <div class="sidebar-header">
                     <div class="logo-small">
                         <span class="icon">🛡️</span>
                         <span>Parental Pro</span>
                     </div>
+                    <button class="menu-toggle" id="menuToggle">☰</button>
                 </div>
-                <div class="sidebar-nav">
+                <div class="sidebar-nav" id="sidebarNav">
                     <div class="nav-item" data-tab="dashboard">
                         <span class="nav-icon">📊</span>
                         <span>Dashboard</span>
@@ -188,10 +188,10 @@
         </div>
     </div>
 
-    <!-- Modal Ajouter Enfant -->
+    <!-- Modals (inchangés mais responsives) -->
     <div id="addChildModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3 id="ruleModalTitle">Ajouter une règle</h3>
+            <div class="modal-header">
                 <h3>➕ Ajouter un nouvel enfant</h3>
                 <button class="modal-close" onclick="closeAddChildModal()">×</button>
             </div>
@@ -199,10 +199,6 @@
                 <div class="form-group">
                     <label>Nom de l'enfant / appareil</label>
                     <input type="text" id="childDeviceName" placeholder="Ex: Téléphone de Lucas" required>
-                </div>
-                <div class="form-group">
-                    <label>Âge de l'enfant (optionnel)</label>
-                    <input type="number" id="childAge" placeholder="Ex: 10">
                 </div>
                 <div class="modal-footer">
                     <button type="button" onclick="closeAddChildModal()" class="btn-secondary">Annuler</button>
@@ -212,10 +208,9 @@
         </div>
     </div>
 
-    <!-- Modal Afficher Code d'Appairage -->
     <div id="pairingCodeModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3 id="ruleModalTitle">Ajouter une règle</h3>
+            <div class="modal-header">
                 <h3>🔑 Code d'appairage</h3>
                 <button class="modal-close" onclick="closePairingCodeModal()">×</button>
             </div>
@@ -240,11 +235,10 @@
         </div>
     </div>
 
-    <!-- Modal Ajout Règle -->
     <div id="ruleModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3 id="ruleModalTitle">Ajouter une règle</h3>
-                <h3>Créer une règle de blocage</h3>
+            <div class="modal-header">
+                <h3 id="ruleModalTitle">Créer une règle de blocage</h3>
                 <button class="modal-close" onclick="closeRuleModal()">×</button>
             </div>
             <form onsubmit="submitRule(event)">
@@ -255,7 +249,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Jour de la semaine</label>
+                    <label>Jour</label>
                     <select id="ruleDay" required>
                         <option value="0">Dimanche</option>
                         <option value="1">Lundi</option>
@@ -268,11 +262,11 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Heure de début</label>
+                        <label>Début</label>
                         <input type="time" id="ruleStart" required>
                     </div>
                     <div class="form-group">
-                        <label>Heure de fin</label>
+                        <label>Fin</label>
                         <input type="time" id="ruleEnd" required>
                     </div>
                 </div>
@@ -283,12 +277,31 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" onclick="closeRuleModal()" class="btn-secondary">Annuler</button>
-                    <button type="submit" class="btn-primary">Créer la règle</button>
+                    <button type="submit" class="btn-primary">Valider</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // Menu toggle pour mobile
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarNav = document.getElementById('sidebarNav');
+        const sidebar = document.getElementById('sidebar');
+        menuToggle.addEventListener('click', () => {
+            sidebarNav.classList.toggle('open');
+            sidebar.classList.toggle('open');
+        });
+        // Fermer le menu après clic sur un lien (mobile)
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    sidebarNav.classList.remove('open');
+                    sidebar.classList.remove('open');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
