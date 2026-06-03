@@ -159,6 +159,12 @@ body {
     color: #e5e7eb;
     font-size: 28px;
     cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.menu-toggle:hover {
+    background: #1a1f2e;
 }
 
 .sidebar-nav {

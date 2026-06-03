@@ -320,29 +320,51 @@ function showToast(msg, type='info') {
     setTimeout(() => { toast.style.animation = 'slideOut 0.3s ease'; setTimeout(()=>toast.remove(),300); }, 3000);
 }
 
-// Modals
+// ============ MODALS ============
 function showAddChildModal() { document.getElementById('addChildModal').style.display = 'flex'; }
 function closeAddChildModal() { document.getElementById('addChildModal').style.display = 'none'; document.getElementById('childDeviceName').value = ''; }
+
 async function generatePairingCode(e) {
     e.preventDefault();
     const deviceName = document.getElementById('childDeviceName').value;
     if (!deviceName) { alert('Entrez un nom'); return; }
     try {
-        const res = await fetch(`${API_URL}/api/pairing/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceName }) });
+        console.log("Envoi requête génération code pour", deviceName);
+        const res = await fetch(`${API_URL}/api/pairing/generate`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceName })
+        });
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errText}`);
+        }
         const data = await res.json();
-        if (res.ok) {
+        console.log("Code reçu:", data);
+        if (data.pairingCode) {
             closeAddChildModal();
             document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
             document.getElementById('pairingCodeModal').style.display = 'flex';
-            setInterval(() => loadChildren(), 3000);
-            setTimeout(() => loadChildren(), 60000);
-        } else alert('Erreur: ' + data.error);
-    } catch (error) { alert('Erreur réseau'); }
+            // Rafraîchir la liste des enfants toutes les 3 secondes pendant 1 minute
+            let count = 0;
+            const interval = setInterval(() => {
+                loadChildren();
+                if (++count >= 20) clearInterval(interval);
+            }, 3000);
+            setTimeout(() => clearInterval(interval), 60000);
+        } else {
+            alert('Erreur: code non reçu');
+        }
+    } catch (error) {
+        console.error("Erreur génération code:", error);
+        alert('Erreur réseau: ' + error.message);
+    }
 }
+
 function closePairingCodeModal() { document.getElementById('pairingCodeModal').style.display = 'none'; }
 function copyPairingCode() { navigator.clipboard.writeText(document.getElementById('pairingCodeDisplay').textContent); showToast('✅ Code copié','success'); }
 
-// Règles
+// ============ RÈGLES ============
 async function loadRules() {
     const container = document.getElementById('rulesList');
     if (!currentChildId) {
@@ -461,7 +483,7 @@ async function deleteRule(ruleId) {
     }
 }
 
-// Notifications avec regroupement
+// ============ NOTIFICATIONS ============
 async function loadNotifications() {
     const container = document.getElementById('notificationsList');
     if (!currentChildId) {
