@@ -529,6 +529,32 @@ async function resetAllData() {
   }
 }
 
+// ============================================================
+// RÉINITIALISER UNIQUEMENT LES MESSAGES
+// ============================================================
+async function resetMessages() {
+  if (!confirm("⚠️ Êtes-vous sûr ?\n\nCette action supprimera TOUS les messages (notifications) de tous les enfants.\n\nLes enfants et les règles de blocage seront conservés.")) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/reset-messages`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      alert("✅ Tous les messages ont été supprimés.");
+      // Recharger la page pour actualiser les listes
+      location.reload();
+    } else {
+      const text = await res.text();
+      alert("Erreur : " + text);
+    }
+  } catch (err) {
+    alert("Erreur réseau : " + err.message);
+  }
+}
+
+window.resetMessages = resetMessages;
+
 // Rendre la fonction globale
 window.resetAllData = resetAllData;
 

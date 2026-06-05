@@ -222,18 +222,15 @@
     </div>
 
     <!-- PARAMÈTRES -->
-    <div id="page-settings" class="page">
-      <div class="page-toolbar">
-        <h2 style="color: var(--accent);">Administration</h2>
-      </div>
-      <div class="panel" style="text-align: center; padding: 32px;">
-        <p style="margin-bottom: 24px;">⚠️ La réinitialisation supprimera tous les enfants, toutes les notifications et toutes les règles. Cette action est irréversible.</p>
-        <button class="btn-primary" style="background: #ef4444; border-color: #ef4444;" onclick="resetAllData()">Réinitialiser tout</button>
-      </div>
-    </div>
-
-  </div><!-- /main -->
-</div><!-- /app -->
+<div id="page-settings" class="page">
+  <div class="page-toolbar">
+    <h2 style="color: var(--accent);">Administration</h2>
+  </div>
+  <div class="panel" style="text-align: center; padding: 32px;">
+    <p style="margin-bottom: 24px;">🗑️ Cette action supprimera TOUS les messages (notifications) de tous les enfants, mais conservera les enfants et les règles de blocage.</p>
+    <button class="btn-primary" style="background: #f59e0b; border-color: #f59e0b;" onclick="resetMessages()">Réinitialiser les messages</button>
+  </div>
+</div>
 
 <!-- MODAL -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
