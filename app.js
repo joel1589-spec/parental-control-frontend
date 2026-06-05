@@ -1,477 +1,574 @@
-// ============ CONFIGURATION ============
+═══
+// CONFIG — LOCAL
+// ═══════════════════════════════════════════════════════════
 const API_URL = 'https://john-dbfu.onrender.com';
-let adminToken = null;
+// Pour Render plus tard: const API_URL = 'https://YOUR-APP.onrender.com';
+// ═══════════════════════════════════════════════════════════
+
+let token = localStorage.getItem('ps_token') || null;
+let currentPage = 'dashboard';
 let currentChildId = null;
-let currentTab = 'dashboard';
-let screenTimeChart = null;
-let currentGraphType = 'daily';
-let currentEditRuleId = null;
+let chartInstance = null;
+let mapInstance = null;
+let mapMarker = null;
 
-let realScreenTimeData = {
-    daily: [0, 0, 0, 0, 0, 0, 0],
-    labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
-    apps: []
-};
-
-// ============ AUTHENTIFICATION ============
-window.login = async function() {
-    const password = document.getElementById('adminPassword').value;
-    if (!password) return alert('Mot de passe requis');
-    try {
-        const res = await fetch(`${API_URL}/api/admin/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password })
-        });
-        const data = await res.json();
-        if (res.ok && data.token) {
-            adminToken = data.token;
-            localStorage.setItem('adminToken', adminToken);
-            // Passer au dashboard
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('dashboardScreen').style.display = 'block';
-            setupNavigation();
-            initChart();
-            loadAllData();
-        } else {
-            alert('Mot de passe incorrect');
-        }
-    } catch (err) {
-        console.error(err);
-        alert('Erreur réseau');
-    }
-};
-
-function showDashboard() {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('dashboardScreen').style.display = 'block';
-}
-
-window.logout = function() {
-    localStorage.removeItem('adminToken');
-    adminToken = null;
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('dashboardScreen').style.display = 'none';
-};
-
-// ============ NAVIGATION ============
-function setupNavigation() {
-    document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
-        item.addEventListener('click', () => switchTab(item.dataset.tab));
-    });
-}
-
-function switchTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.nav-item[data-tab="${tab}"]`).classList.add('active');
-    
-    // Cacher toutes les sections
-    document.getElementById('childrenSection').style.display = 'none';
-    document.getElementById('rulesSection').style.display = 'none';
-    document.getElementById('notificationsSection').style.display = 'none';
-    
-    if (tab === 'dashboard') {
-        document.getElementById('childrenSection').style.display = 'block';
-        document.getElementById('pageTitle').innerText = 'Tableau de bord';
-        document.getElementById('pageSubtitle').innerText = 'Analyse du temps d\'écran et activités';
-        if (currentChildId) {
-            loadStats();
-            loadTopApps();
-        }
-    } else if (tab === 'children') {
-        document.getElementById('childrenSection').style.display = 'block';
-        document.getElementById('pageTitle').innerText = 'Gestion des enfants';
-        document.getElementById('pageSubtitle').innerText = 'Ajoutez et supervisez les appareils';
-        loadChildren();
-    } else if (tab === 'rules') {
-        document.getElementById('rulesSection').style.display = 'block';
-        document.getElementById('pageTitle').innerText = 'Règles de blocage';
-        document.getElementById('pageSubtitle').innerText = 'Définissez les plages horaires';
-        if (currentChildId) loadRules();
-        else document.getElementById('rulesList').innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>';
-    } else if (tab === 'notifications') {
-        document.getElementById('notificationsSection').style.display = 'block';
-        document.getElementById('pageTitle').innerText = 'Flux de notifications';
-        document.getElementById('pageSubtitle').innerText = 'Consultez l\'activité en temps réel';
-        if (currentChildId) loadNotifications();
-        else document.getElementById('notificationsList').innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>';
-    }
-}
-
-// ============ STATS ============
-async function loadStats() {
-    if (!currentChildId) return;
-    try {
-        const [childrenRes, rulesRes] = await Promise.all([
-            fetch(`${API_URL}/api/admin/children`, { headers: { Authorization: `Bearer ${adminToken}` } }),
-            fetch(`${API_URL}/api/admin/rules/${currentChildId}`, { headers: { Authorization: `Bearer ${adminToken}` } })
-        ]);
-        const childrenData = await childrenRes.json();
-        const rulesData = await rulesRes.json();
-        const child = childrenData.children.find(c => c.id === currentChildId);
-        const screenHours = child?.screen_time ? (child.screen_time / 3600).toFixed(1) : '0';
-        document.getElementById('totalChildren').innerText = childrenData.children.length;
-        document.getElementById('totalRules').innerText = (rulesData.rules || []).length;
-        document.getElementById('totalScreenTime').innerText = `${screenHours}h`;
-        
-        const notifRes = await fetch(`${API_URL}/api/admin/children/${currentChildId}/notifications?limit=1`, { headers: { Authorization: `Bearer ${adminToken}` } });
-        const notifData = await notifRes.json();
-        const unread = (notifData.notifications || []).filter(n => !n.is_read).length;
-        document.getElementById('totalNotifs').innerText = unread;
-    } catch (err) { console.error(err); }
-}
-
-// ============ ENFANTS ============
-async function loadChildren() {
-    if (!adminToken) return;
-    try {
-        const res = await fetch(`${API_URL}/api/admin/children`, { headers: { Authorization: `Bearer ${adminToken}` } });
-        const data = await res.json();
-        const children = data.children || [];
-        const container = document.getElementById('childrenList');
-        const select = document.getElementById('childSelect');
-        document.getElementById('totalChildren').innerText = children.length;
-        
-        select.innerHTML = '<option value="">Sélectionner un enfant</option>' + children.map(c => `<option value="${c.id}">${c.device_name}</option>`).join('');
-        
-        if (!children.length) {
-            container.innerHTML = '<div class="empty-state">Aucun enfant appairé</div>';
-            return;
-        }
-        container.innerHTML = children.map(c => `
-            <div class="child-card" onclick="selectChild('${c.id}')">
-                <div><strong>${c.device_name}</strong><br><small>ID: ${c.id.substring(0,8)}</small></div>
-                <div class="child-actions">
-                    <button class="btn-icon-small" onclick="event.stopPropagation(); viewChildStats('${c.id}')">📊 Voir stats</button>
-                    <button class="btn-icon-small" onclick="event.stopPropagation(); deleteChild('${c.id}')">🗑️ Supprimer</button>
-                </div>
-            </div>
-        `).join('');
-        
-        const saved = localStorage.getItem('selectedChildId');
-        if (saved && children.find(c => c.id === saved)) {
-            currentChildId = saved;
-            select.value = saved;
-            if (currentTab === 'dashboard') { loadStats(); loadTopApps(); }
-            if (currentTab === 'rules') loadRules();
-            if (currentTab === 'notifications') loadNotifications();
-        }
-    } catch (err) { console.error(err); }
-}
-
-window.selectChild = function(id) {
-    currentChildId = id;
-    localStorage.setItem('selectedChildId', id);
-    document.getElementById('childSelect').value = id;
-    if (currentTab === 'dashboard') { loadStats(); loadTopApps(); }
-    if (currentTab === 'rules') loadRules();
-    if (currentTab === 'notifications') loadNotifications();
-    alert('Enfant sélectionné');
-};
-
-window.viewChildStats = function(id) {
-    selectChild(id);
-    switchTab('dashboard');
-};
-
-window.deleteChild = async function(childId) {
-    if (!confirm('Supprimer cet enfant ?')) return;
-    try {
-        const res = await fetch(`${API_URL}/api/admin/children/${childId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminToken}` } });
-        if (res.ok) {
-            if (currentChildId === childId) currentChildId = null;
-            loadChildren();
-            if (currentTab === 'dashboard') loadStats();
-        } else alert('Erreur suppression');
-    } catch (err) { alert('Erreur réseau'); }
-};
-
-// ============ GÉNÉRATION CODE ============
-window.showAddChildModal = function() {
-    document.getElementById('addChildModal').style.display = 'flex';
-};
-window.closeAddChildModal = function() {
-    document.getElementById('addChildModal').style.display = 'none';
-    document.getElementById('childDeviceName').value = '';
-};
-window.generatePairingCode = async function(e) {
-    if (e) e.preventDefault();
-    const deviceName = document.getElementById('childDeviceName').value.trim();
-    if (!deviceName) return alert('Nom requis');
-    try {
-        const res = await fetch(`${API_URL}/api/pairing/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceName })
-        });
-        const data = await res.json();
-        if (res.ok && data.pairingCode) {
-            document.getElementById('pairingCodeDisplay').innerText = data.pairingCode;
-            document.getElementById('pairingCodeModal').style.display = 'flex';
-            closeAddChildModal();
-            loadChildren();
-        } else alert('Erreur: ' + (data.error || 'Code non reçu'));
-    } catch (err) { alert('Erreur réseau'); }
-};
-window.closePairingCodeModal = function() {
-    document.getElementById('pairingCodeModal').style.display = 'none';
-};
-window.copyPairingCode = function() {
-    const code = document.getElementById('pairingCodeDisplay').innerText;
-    navigator.clipboard.writeText(code);
-    alert('Code copié');
-};
-
-// ============ RÈGLES ============
-async function loadRules() {
-    if (!currentChildId) {
-        document.getElementById('rulesList').innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>';
-        return;
-    }
-    try {
-        const res = await fetch(`${API_URL}/api/admin/rules/${currentChildId}`, { headers: { Authorization: `Bearer ${adminToken}` } });
-        const data = await res.json();
-        const rules = data.rules || [];
-        const container = document.getElementById('rulesList');
-        if (!rules.length) {
-            container.innerHTML = '<div class="empty-state">Aucune règle configurée</div>';
-            return;
-        }
-        const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-        container.innerHTML = rules.map(r => `
-            <div class="rule-item">
-                <div>${days[r.day_of_week]} ${String(r.start_hour).padStart(2,'0')}:${String(r.start_minute).padStart(2,'0')} → ${String(r.end_hour).padStart(2,'0')}:${String(r.end_minute).padStart(2,'0')} ${r.app_package ? `(${r.app_package})` : '(toutes les applis)'}</div>
-                <div class="child-actions">
-                    <button class="btn-icon-small" onclick="editRule(${r.id})">✏️ Modifier</button>
-                    <button class="btn-icon-small" onclick="deleteRule(${r.id})">🗑️ Supprimer</button>
-                </div>
-            </div>
-        `).join('');
-    } catch (err) { console.error(err); }
-}
-
-window.showAddRuleModal = function() {
-    if (!currentChildId) return alert('Sélectionnez un enfant');
-    currentEditRuleId = null;
-    document.getElementById('ruleModalTitle').innerText = 'Ajouter une règle';
-    document.getElementById('ruleStart').value = '';
-    document.getElementById('ruleEnd').value = '';
-    document.getElementById('ruleApp').value = '';
-    document.getElementById('ruleModal').style.display = 'flex';
-    fetch(`${API_URL}/api/admin/children`, { headers: { Authorization: `Bearer ${adminToken}` } })
-        .then(res => res.json())
-        .then(data => {
-            const select = document.getElementById('ruleChildId');
-            select.innerHTML = data.children.map(c => `<option value="${c.id}" ${c.id === currentChildId ? 'selected' : ''}>${c.device_name}</option>`).join('');
-        });
-};
-window.closeRuleModal = function() { document.getElementById('ruleModal').style.display = 'none'; };
-window.submitRule = async function(e) {
-    if (e) e.preventDefault();
-    const childId = document.getElementById('ruleChildId').value;
-    const dayOfWeek = parseInt(document.getElementById('ruleDay').value);
-    const start = document.getElementById('ruleStart').value;
-    const end = document.getElementById('ruleEnd').value;
-    if (!start || !end) return alert('Heures requises');
-    const startHour = parseInt(start.split(':')[0]), startMinute = parseInt(start.split(':')[1]);
-    const endHour = parseInt(end.split(':')[0]), endMinute = parseInt(end.split(':')[1]);
-    const appPackage = document.getElementById('ruleApp').value || null;
-    const body = { childId, dayOfWeek, startHour, startMinute, endHour, endMinute, appPackage };
-    let url = `${API_URL}/api/admin/rules`;
-    let method = 'POST';
-    if (currentEditRuleId) {
-        url = `${API_URL}/api/admin/rules/${currentEditRuleId}`;
-        method = 'PUT';
-    }
-    try {
-        const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-            body: JSON.stringify(body)
-        });
-        if (res.ok) {
-            closeRuleModal();
-            loadRules();
-            alert(currentEditRuleId ? 'Règle modifiée' : 'Règle ajoutée');
-        } else alert('Erreur');
-    } catch (err) { alert('Erreur réseau'); }
-};
-window.editRule = async function(ruleId) {
-    currentEditRuleId = ruleId;
-    const res = await fetch(`${API_URL}/api/admin/rules/${currentChildId}`, { headers: { Authorization: `Bearer ${adminToken}` } });
+// ─────────────────────────────────────────
+// API
+// ─────────────────────────────────────────
+async function api(method, path, body = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API_URL + path, opts);
+    if (res.status === 401) { logout(); return null; }
     const data = await res.json();
-    const rule = data.rules.find(r => r.id == ruleId);
-    if (!rule) return;
-    document.getElementById('ruleModalTitle').innerText = 'Modifier la règle';
-    document.getElementById('ruleStart').value = `${String(rule.start_hour).padStart(2,'0')}:${String(rule.start_minute).padStart(2,'0')}`;
-    document.getElementById('ruleEnd').value = `${String(rule.end_hour).padStart(2,'0')}:${String(rule.end_minute).padStart(2,'0')}`;
-    document.getElementById('ruleApp').value = rule.app_package || '';
-    document.getElementById('ruleModal').style.display = 'flex';
-    fetch(`${API_URL}/api/admin/children`, { headers: { Authorization: `Bearer ${adminToken}` } })
-        .then(res => res.json())
-        .then(data => {
-            const select = document.getElementById('ruleChildId');
-            select.innerHTML = data.children.map(c => `<option value="${c.id}" ${c.id === rule.child_id ? 'selected' : ''}>${c.device_name}</option>`).join('');
-        });
-};
-window.deleteRule = async function(ruleId) {
-    if (!confirm('Supprimer cette règle ?')) return;
-    try {
-        const res = await fetch(`${API_URL}/api/admin/rules/${ruleId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminToken}` } });
-        if (res.ok) loadRules();
-        else alert('Erreur');
-    } catch (err) { alert('Erreur réseau'); }
-};
-
-// ============ NOTIFICATIONS ============
-async function loadNotifications() {
-    if (!currentChildId) {
-        document.getElementById('notificationsList').innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>';
-        return;
+    if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+    return data;
+  } catch (e) {
+    if (e.message.includes('Failed to fetch')) {
+      showNetworkError();
+      return null;
     }
-    try {
-        const res = await fetch(`${API_URL}/api/admin/children/${currentChildId}/notifications?limit=200`, { headers: { Authorization: `Bearer ${adminToken}` } });
-        const data = await res.json();
-        let notifs = data.notifications || [];
-        if (!notifs.length) {
-            document.getElementById('notificationsList').innerHTML = '<div class="empty-state">Aucune notification reçue</div>';
-            return;
-        }
-        notifs.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-        const conversations = {};
-        notifs.forEach(n => {
-            let contact = n.title || 'Inconnu';
-            if (contact.includes(':')) contact = contact.split(':')[1].trim();
-            if (!conversations[contact]) conversations[contact] = [];
-            conversations[contact].push(n);
-        });
-        let html = '';
-        for (const [contact, msgs] of Object.entries(conversations)) {
-            const unread = msgs.filter(m => !m.is_read).length;
-            html += `
-                <div class="conversation-item">
-                    <div class="conversation-header" onclick="toggleConversation('${contact.replace(/'/g, "\\'")}')">
-                        <span class="contact-name">👤 ${contact}</span>
-                        <span class="msg-count">${msgs.length} message${msgs.length>1?'s':''} ${unread?`(${unread} non lu${unread>1?'s':''})`:''}</span>
-                        <span class="toggle-icon">▼</span>
-                    </div>
-                    <div class="conversation-messages" id="conv-${contact.replace(/[^a-z0-9]/gi, '_')}" style="display:none;">
-                        ${msgs.map(m => `
-                            <div class="notification-item" onclick="markAsRead(${m.id})">
-                                <div><strong>${m.type === 'outgoing' ? '➡️ Envoyé' : '⬅️ Reçu'} via ${m.app_name}</strong> <small>${new Date(m.timestamp).toLocaleString()}</small></div>
-                                <div class="notification-content">${m.content || ''}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        document.getElementById('notificationsList').innerHTML = html;
-    } catch (err) { console.error(err); }
+    throw e;
+  }
 }
-window.toggleConversation = function(contact) {
-    const id = 'conv-' + contact.replace(/[^a-z0-9]/gi, '_');
-    const el = document.getElementById(id);
-    if (el) {
-        if (el.style.display === 'none') {
-            el.style.display = 'block';
-            const header = el.previousElementSibling;
-            if (header) header.querySelector('.toggle-icon').innerHTML = '▲';
-        } else {
-            el.style.display = 'none';
-            const header = el.previousElementSibling;
-            if (header) header.querySelector('.toggle-icon').innerHTML = '▼';
-        }
+
+function showNetworkError() {
+  // Non-blocking toast
+  let t = document.getElementById('net-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'net-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1a2332;border:1px solid rgba(248,113,113,0.3);color:#F87171;padding:12px 18px;border-radius:10px;font-size:13px;z-index:9999;';
+    t.textContent = '⚠️  Impossible de joindre le backend (localhost:3001)';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 5000);
+  }
+}
+
+// ─────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────
+async function login() {
+  const pw = document.getElementById('login-password').value;
+  const btn = document.getElementById('btn-login');
+  const err = document.getElementById('login-error');
+  err.classList.add('hidden');
+  btn.style.opacity = '0.7';
+  btn.disabled = true;
+  try {
+    const data = await api('POST', '/admin/login', { password: pw });
+    if (!data) { btn.style.opacity = '1'; btn.disabled = false; return; }
+    token = data.token;
+    localStorage.setItem('ps_token', token);
+    initApp();
+  } catch {
+    err.classList.remove('hidden');
+    btn.style.opacity = '1'; btn.disabled = false;
+  }
+}
+
+function logout() {
+  token = null;
+  localStorage.removeItem('ps_token');
+  document.getElementById('login-screen').classList.add('active');
+  document.getElementById('app-screen').classList.remove('active');
+  document.getElementById('login-password').value = '';
+}
+
+document.getElementById('login-password')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+async function initApp() {
+  document.getElementById('login-screen').classList.remove('active');
+  document.getElementById('app-screen').classList.add('active');
+  await loadChildren();
+  showPage('dashboard');
+}
+
+async function loadChildren() {
+  const children = await api('GET', '/admin/children');
+  if (!children) return [];
+
+  // Child selector
+  const sel = document.getElementById('child-selector');
+  sel.innerHTML = '<option value="">— Enfant —</option>';
+  children.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    sel.appendChild(o);
+  });
+  if (children.length && !currentChildId) {
+    currentChildId = children[0].id;
+    sel.value = currentChildId;
+  }
+
+  // Nav badges
+  const onlineCount = children.filter(c => c.online).length;
+  setBadge('nav-badge-children', onlineCount);
+
+  renderChildrenTable(children);
+  return children;
+}
+
+function onChildChange() {
+  currentChildId = document.getElementById('child-selector').value || null;
+  refreshPage();
+}
+
+function setBadge(id, n) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (n > 0) { el.textContent = n; el.classList.add('show'); }
+  else { el.classList.remove('show'); }
+}
+
+// ─────────────────────────────────────────
+// PAGES
+// ─────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  currentPage = page;
+  document.getElementById(`page-${page}`)?.classList.add('active');
+  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  const titles = { dashboard:'Dashboard', children:'Enfants', notifications:'Messages', rules:'Règles de blocage', location:'Localisation' };
+  document.getElementById('page-title').textContent = titles[page] || page;
+  const needChild = ['notifications','rules','location','dashboard'].includes(page);
+  document.getElementById('child-selector-wrap').classList.toggle('hidden', !needChild);
+  refreshPage();
+  if (window.innerWidth <= 768) closeSidebar();
+}
+
+function refreshPage() {
+  if (currentPage === 'dashboard') loadDashboard();
+  else if (currentPage === 'notifications') loadNotifications();
+  else if (currentPage === 'rules') loadRules();
+  else if (currentPage === 'location') loadLocation();
+}
+
+// ─────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────
+async function loadDashboard() {
+  const [dash] = await Promise.all([api('GET', '/admin/dashboard')]);
+  if (!dash) return;
+  document.getElementById('stat-children').textContent = dash.children;
+  document.getElementById('stat-rules').textContent = dash.active_rules;
+  document.getElementById('stat-unread').textContent = dash.unread_notifications;
+  document.getElementById('stat-screen-time').textContent = fmtDuration(dash.screen_time_today);
+  setBadge('nav-badge-notif', dash.unread_notifications);
+  if (currentChildId) loadChartData('day');
+}
+
+async function loadChartData(period) {
+  if (!currentChildId) return;
+  const stats = await api('GET', `/admin/children/${currentChildId}/stats?period=${period}`);
+  if (!stats) return;
+  renderChart(stats.screen_time, period);
+  renderTopApps(stats.top_apps);
+}
+
+function setPeriod(period, btn) {
+  document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadChartData(period);
+}
+
+function renderChart(data, period) {
+  const ctx = document.getElementById('chart-screentime');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const byDate = {};
+  data.forEach(r => {
+    const d = (r.logged_date || '').toString().substring(0,10) || 'N/A';
+    byDate[d] = (byDate[d] || 0) + parseInt(r.total || 0);
+  });
+  const labels = Object.keys(byDate).sort();
+  const values = labels.map(l => Math.round(byDate[l] / 60));
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels.length ? labels : ['Aucune donnée'],
+      datasets: [{
+        label: 'Temps (min)',
+        data: values.length ? values : [0],
+        backgroundColor: 'rgba(200,255,0,0.15)',
+        borderColor: 'rgba(200,255,0,0.7)',
+        borderWidth: 1.5,
+        borderRadius: 6,
+        borderSkipped: false,
+        hoverBackgroundColor: 'rgba(200,255,0,0.3)',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#0D1117',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#F0F4FF',
+        bodyColor: '#8A9BB5',
+        padding: 12,
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5A72', font: { size: 11 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5A72', font: { size: 11 } } }
+      }
     }
-};
-window.markAsRead = async function(notifId) {
-    try {
-        await fetch(`${API_URL}/api/admin/notifications/${notifId}/read`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` } });
-        loadNotifications();
-        if (currentTab === 'dashboard') loadStats();
-    } catch (err) { console.error(err); }
-};
-
-// ============ TOP APPLICATIONS ============
-async function loadTopApps() {
-    if (!currentChildId) return;
-    try {
-        const res = await fetch(`${API_URL}/api/admin/children/${currentChildId}/notifications?limit=200`, { headers: { Authorization: `Bearer ${adminToken}` } });
-        const data = await res.json();
-        const notifs = data.notifications || [];
-        const appCount = {};
-        notifs.forEach(n => { appCount[n.app_name] = (appCount[n.app_name] || 0) + 1; });
-        const sorted = Object.entries(appCount).sort((a,b) => b[1] - a[1]).slice(0,5);
-        const total = notifs.length;
-        const html = sorted.map(([app, count]) => `<div style="margin-bottom:8px;"><strong>${app}</strong> : ${count} notification${count>1?'s':''} (${((count/total)*100).toFixed(1)}%)</div>`).join('');
-        document.getElementById('topAppsList').innerHTML = html || '<div>Aucune donnée</div>';
-    } catch (err) { console.error(err); }
+  });
 }
-window.refreshTopApps = loadTopApps;
 
-// ============ GRAPHIQUES ============
-function initChart() {
-    const canvas = document.getElementById('screenTimeChart');
-    if (!canvas) return;
-    if (screenTimeChart) screenTimeChart.destroy();
-    screenTimeChart = new Chart(canvas.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: realScreenTimeData.labels,
-            datasets: [{ label: 'Temps d\'écran (heures)', data: realScreenTimeData.daily, backgroundColor: '#667eea', borderRadius: 8 }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            scales: { y: { beginAtZero: true, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } }, x: { ticks: { color: '#9ca3af' } } }
-        }
-    });
+function renderTopApps(apps) {
+  const ul = document.getElementById('top-apps-list');
+  ul.innerHTML = '';
+  if (!apps?.length) { ul.innerHTML = '<li class="text-muted" style="padding:12px 0;font-size:13px">Aucune donnée</li>'; return; }
+  apps.forEach(a => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="app-name">${appIcon(a.app_name)} ${a.app_name}</span><span class="app-pill">${a.notification_count}</span>`;
+    ul.appendChild(li);
+  });
 }
-window.switchGraph = function(type) {
-    currentGraphType = type;
-    if (type === 'daily') {
-        screenTimeChart.data.datasets[0].data = realScreenTimeData.daily;
-        screenTimeChart.data.labels = realScreenTimeData.labels;
-    } else if (type === 'weekly') {
-        const weekly = [realScreenTimeData.daily.reduce((a,b)=>a+b,0)];
-        screenTimeChart.data.datasets[0].data = weekly;
-        screenTimeChart.data.labels = ['Cette semaine'];
-    } else if (type === 'apps') {
-        screenTimeChart.data.datasets[0].data = [0];
-        screenTimeChart.data.labels = ['Aucune donnée'];
-    }
-    screenTimeChart.update();
-};
-function updateChartWithRealData() {}
-function updateDailyData(notifications) {}
 
-// ============ INITIALISATION ============
-async function loadAllData() {
+// ─────────────────────────────────────────
+// CHILDREN
+// ─────────────────────────────────────────
+function renderChildrenTable(children) {
+  const tb = document.getElementById('children-tbody');
+  tb.innerHTML = '';
+  if (!children.length) {
+    tb.innerHTML = `<tr><td colspan="4"><div class="empty-state">Aucun enfant enregistré.<br><br><button class="btn-primary" onclick="showAddChild()">+ Ajouter</button></div></td></tr>`;
+    return;
+  }
+  children.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${c.name}</td>
+      <td><span class="badge ${c.online ? 'badge-online' : 'badge-offline'}">${c.online ? 'En ligne' : 'Hors ligne'}</span></td>
+      <td>${c.last_seen ? timeAgo(c.last_seen) : '<span style="color:var(--text-3)">Jamais</span>'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-icon accent" title="Statistiques" onclick="showChildStats(${c.id},'${c.name}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </button>
+          <button class="btn-icon" title="Nouveau code" onclick="showPairingCode(${c.id},'${c.name}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </button>
+          <button class="btn-icon danger" title="Supprimer" onclick="deleteChild(${c.id},'${c.name}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </td>`;
+    document.getElementById('children-tbody').appendChild(tr);
+  });
+}
+
+function showAddChild() {
+  openModal(`
+    <div class="modal-title">Ajouter un enfant</div>
+    <div class="form-row">
+      <label class="form-label">PRÉNOM</label>
+      <input class="form-input" id="new-child-name" placeholder="Ex : Lucas" autofocus/>
+    </div>
+    <button class="modal-btn" onclick="createChild()">Créer & générer le code</button>
+  `);
+}
+
+async function createChild() {
+  const name = document.getElementById('new-child-name')?.value.trim();
+  if (!name) return;
+  try {
+    const data = await api('POST', '/admin/children', { name });
+    if (!data) return;
+    closeModal();
     await loadChildren();
-    if (currentChildId && currentTab === 'dashboard') {
-        await loadStats();
-        await loadTopApps();
-    }
+    showPairingModal(data.pairing_code, name, data.expires_at);
+  } catch(e) { alert(e.message); }
 }
 
-window.onload = () => {
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-        adminToken = token;
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('dashboardScreen').style.display = 'block';
-        setupNavigation();
-        initChart();
-        loadAllData();
-    } else {
-        document.getElementById('loginScreen').style.display = 'flex';
-        document.getElementById('dashboardScreen').style.display = 'none';
-    }
-};
+async function showPairingCode(id, name) {
+  const data = await api('POST', `/admin/children/${id}/pairing-code`);
+  if (!data) return;
+  showPairingModal(data.pairing_code, name, data.expires_at);
+}
 
-// Rendre les fonctions globales pour les boutons HTML
-window.onChildSelect = function() {
-    const id = document.getElementById('childSelect').value;
-    if (id) selectChild(id);
-};
+function showPairingModal(code, name, exp) {
+  openModal(`
+    <div class="modal-title">Code d'appairage</div>
+    <p style="color:var(--text-2);font-size:13px;margin-bottom:4px">Saisir ce code dans l'app Android pour <strong style="color:var(--text)">${name}</strong> :</p>
+    <div class="pairing-code-display">${code}</div>
+    <p class="pairing-hint">⏱ Expire à ${new Date(exp).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})}</p>
+  `);
+}
+
+async function showChildStats(id, name) {
+  const stats = await api('GET', `/admin/children/${id}/stats?period=week`);
+  if (!stats) return;
+  const total = stats.screen_time.reduce((s,r) => s + parseInt(r.total||0), 0);
+  const apps = stats.top_apps.map(a => `
+    <li style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-2)">${appIcon(a.app_name)} ${a.app_name}</span>
+      <span class="app-pill">${a.notification_count} notifs</span>
+    </li>`).join('') || '<li style="padding:10px 0;color:var(--text-3)">Aucune donnée</li>';
+  openModal(`
+    <div class="modal-title">Statistiques — ${name}</div>
+    <div style="padding:16px;background:var(--accent-bg);border:1px solid rgba(200,255,0,0.1);border-radius:10px;margin-bottom:20px">
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">TEMPS D'ÉCRAN (7 JOURS)</div>
+      <div style="font-family:var(--font-head);font-size:28px;font-weight:800;color:var(--accent)">${fmtDuration(total)}</div>
+    </div>
+    <div style="font-size:11px;letter-spacing:1.2px;font-weight:700;color:var(--text-3);margin-bottom:10px">TOP APPLICATIONS</div>
+    <ul style="list-style:none">${apps}</ul>
+  `);
+}
+
+async function deleteChild(id, name) {
+  if (!confirm(`Supprimer ${name} ? Toutes ses données seront perdues.`)) return;
+  await api('DELETE', `/admin/children/${id}`);
+  await loadChildren();
+}
+
+// ─────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────
+async function loadNotifications() {
+  const list = document.getElementById('convs-list');
+  if (!currentChildId) { list.innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>'; return; }
+  const convs = await api('GET', `/admin/children/${currentChildId}/notifications`);
+  if (!convs) return;
+  list.innerHTML = '';
+  if (!convs.length) { list.innerHTML = '<div class="empty-state">Aucun message</div>'; return; }
+  convs.forEach(conv => {
+    const div = document.createElement('div');
+    div.className = 'conv-card';
+    const unread = parseInt(conv.unread_count) || 0;
+    div.innerHTML = `
+      <div class="conv-header" onclick="toggleConv(this)">
+        <div class="conv-avatar">${(conv.contact||'?').charAt(0).toUpperCase()}</div>
+        <div class="conv-info">
+          <div class="conv-name">${conv.contact || 'Inconnu'}</div>
+          <div class="conv-app">${appIcon(conv.app_name)} ${conv.app_name}</div>
+        </div>
+        <div class="conv-right">
+          ${unread > 0 ? `<span class="unread-pill">${unread}</span>` : ''}
+          <span class="conv-time">${timeAgo(conv.last_message_at)}</span>
+        </div>
+        <svg class="conv-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="conv-messages">
+        ${(conv.messages||[]).map(m => `
+          <div class="msg ${m.direction}">
+            <span class="msg-dir">${m.direction==='incoming'?'←':'→'}</span>${m.content||'(vide)'}
+            <div class="msg-time">${new Date(m.received_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>`).join('')}
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleConv(header) {
+  const card = header.parentElement;
+  card.classList.toggle('open');
+}
+
+async function markAllRead() {
+  if (!currentChildId) return;
+  await api('PATCH', `/admin/children/${currentChildId}/notifications/read-all`);
+  loadNotifications();
+  loadDashboard();
+}
+
+// ─────────────────────────────────────────
+// RULES
+// ─────────────────────────────────────────
+const DAYS = ['everyday','monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+const DAYS_FR = { everyday:'Tous les jours', monday:'Lundi', tuesday:'Mardi', wednesday:'Mercredi', thursday:'Jeudi', friday:'Vendredi', saturday:'Samedi', sunday:'Dimanche' };
+
+async function loadRules() {
+  const tb = document.getElementById('rules-tbody');
+  if (!currentChildId) { tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Sélectionnez un enfant</div></td></tr>'; return; }
+  const rules = await api('GET', `/admin/children/${currentChildId}/rules`);
+  if (!rules) return;
+  tb.innerHTML = '';
+  if (!rules.length) { tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>'; return; }
+  rules.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${DAYS_FR[r.day_of_week]||r.day_of_week}</td>
+      <td>${r.start_time} → ${r.end_time}</td>
+      <td>${r.app_package ? `<code style="font-size:11px;color:var(--text-3)">${r.app_package}</code>` : '<span style="color:var(--text-3)">Toutes</span>'}</td>
+      <td><span class="badge ${r.is_active?'badge-active':'badge-inactive'}">${r.is_active?'Actif':'Inactif'}</span></td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-icon" onclick="showEditRule(${r.id},'${r.day_of_week}','${r.start_time?.substring(0,5)}','${r.end_time?.substring(0,5)}','${r.app_package||''}',${r.is_active})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteRule(${r.id})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function ruleForm(day='everyday', start='21:00', end='07:00', app='', active=true) {
+  return `
+    <div class="form-row"><label class="form-label">JOUR</label>
+      <select class="form-select" id="r-day">${DAYS.map(d=>`<option value="${d}"${d===day?' selected':''}>${DAYS_FR[d]}</option>`).join('')}</select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-row"><label class="form-label">DÉBUT</label><input class="form-input" type="time" id="r-start" value="${start}"/></div>
+      <div class="form-row"><label class="form-label">FIN</label><input class="form-input" type="time" id="r-end" value="${end}"/></div>
+    </div>
+    <div class="form-row"><label class="form-label">PACKAGE APP (vide = toutes)</label><input class="form-input" id="r-app" placeholder="com.whatsapp" value="${app}"/></div>
+    <div class="form-row"><label class="form-check"><input type="checkbox" id="r-active"${active?' checked':''}/> Règle active immédiatement</label></div>
+  `;
+}
+
+function showAddRule() {
+  if (!currentChildId) return alert('Sélectionnez un enfant d\'abord');
+  openModal(`<div class="modal-title">Ajouter une règle</div>${ruleForm()}<button class="modal-btn" onclick="createRule()">Créer la règle</button>`);
+}
+
+function showEditRule(id, day, start, end, app, active) {
+  openModal(`<div class="modal-title">Modifier la règle</div>${ruleForm(day, start, end, app, active)}<button class="modal-btn" onclick="updateRule(${id})">Enregistrer</button>`);
+}
+
+function getRuleBody() {
+  return {
+    day_of_week: document.getElementById('r-day').value,
+    start_time:  document.getElementById('r-start').value,
+    end_time:    document.getElementById('r-end').value,
+    app_package: document.getElementById('r-app').value || null,
+    is_active:   document.getElementById('r-active').checked,
+  };
+}
+
+async function createRule() {
+  try { await api('POST', `/admin/children/${currentChildId}/rules`, getRuleBody()); closeModal(); loadRules(); }
+  catch(e) { alert(e.message); }
+}
+
+async function updateRule(id) {
+  try { await api('PUT', `/admin/rules/${id}`, getRuleBody()); closeModal(); loadRules(); }
+  catch(e) { alert(e.message); }
+}
+
+async function deleteRule(id) {
+  if (!confirm('Supprimer cette règle ?')) return;
+  await api('DELETE', `/admin/rules/${id}`);
+  loadRules();
+}
+
+// ─────────────────────────────────────────
+// LOCATION
+// ─────────────────────────────────────────
+async function loadLocation() {
+  const meta = document.getElementById('loc-meta');
+  if (!currentChildId) { meta.innerHTML = '<span class="loc-chip">Sélectionnez un enfant</span>'; return; }
+
+  if (!mapInstance) {
+    mapInstance = L.map('map', { zoomControl: true }).setView([48.8566, 2.3522], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '©OpenStreetMap ©CARTO', maxZoom: 19
+    }).addTo(mapInstance);
+  }
+
+  const locs = await api('GET', `/admin/children/${currentChildId}/location`);
+  if (!locs?.length) { meta.innerHTML = '<span class="loc-chip">📡 Aucune position reçue</span>'; return; }
+
+  const latest = locs[0];
+  const ll = [parseFloat(latest.latitude), parseFloat(latest.longitude)];
+  mapInstance.setView(ll, 15);
+
+  if (mapMarker) mapMarker.remove();
+  const icon = L.divIcon({
+    html: `<div style="width:14px;height:14px;background:#C8FF00;border-radius:50%;border:3px solid #0D1117;box-shadow:0 0 16px rgba(200,255,0,0.7)"></div>`,
+    className: '', iconSize: [14,14], iconAnchor: [7,7]
+  });
+  mapMarker = L.marker(ll, { icon }).addTo(mapInstance);
+  mapMarker.bindPopup(`
+    <div style="font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6">
+      <strong>${document.querySelector('#child-selector option:checked')?.textContent||'Enfant'}</strong><br>
+      🕐 ${new Date(latest.recorded_at).toLocaleString('fr-FR')}<br>
+      🔋 ${latest.battery_level??'?'}% · ${latest.is_connected?'En ligne':'Hors ligne'}
+    </div>`).openPopup();
+
+  if (locs.length > 1) {
+    const trail = locs.map(l => [parseFloat(l.latitude), parseFloat(l.longitude)]);
+    L.polyline(trail, { color:'#C8FF00', weight:2, opacity:0.3 }).addTo(mapInstance);
+  }
+
+  meta.innerHTML = `
+    <span class="loc-chip">📍 ${latest.latitude.toFixed(5)}, ${latest.longitude.toFixed(5)}</span>
+    <span class="loc-chip">🕐 ${timeAgo(latest.recorded_at)}</span>
+    <span class="loc-chip">🔋 ${latest.battery_level??'?'}%</span>
+    <span class="loc-chip">📡 ±${Math.round(latest.accuracy||0)}m</span>
+    <span class="loc-chip ${latest.is_connected?'':''}">📶 ${latest.is_connected?'En ligne':'Dernière position (hors ligne)'}</span>
+  `;
+}
+
+// ─────────────────────────────────────────
+// MODAL
+// ─────────────────────────────────────────
+function openModal(html) {
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
+
+// ─────────────────────────────────────────
+// SIDEBAR
+// ─────────────────────────────────────────
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+function fmtDuration(sec) {
+  if (!sec) return '0 min';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'à l\'instant';
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `il y a ${h}h`;
+  return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+function appIcon(name='') {
+  const n = (name||'').toLowerCase();
+  if (n.includes('whatsapp')) return '💚';
+  if (n.includes('telegram')) return '✈️';
+  if (n.includes('sms') || n.includes('message')) return '💬';
+  if (n.includes('instagram')) return '📷';
+  if (n.includes('tiktok')) return '🎵';
+  if (n.includes('youtube')) return '▶️';
+  return '📱';
+}
+
+// ─────────────────────────────────────────
+// AUTO-START
+// ─────────────────────────────────────────
+if (token) initApp();
+

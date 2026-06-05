@@ -1,303 +1,239 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Parental Control Pro - Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ParentShield — Contrôle Parental</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-    <div class="app">
-        <!-- Login Screen -->
-        <div id="loginScreen" class="screen active">
-            <div class="login-container">
-                <div class="login-card">
-                    <div class="logo">
-                        <div class="logo-icon">🛡️</div>
-                        <h1>Parental Control</h1>
-                        <p>Solution professionnelle de supervision</p>
-                    </div>
-                    <div class="login-form">
-                        <input type="password" id="adminPassword" placeholder="Mot de passe administrateur">
-                        <button onclick="login()" class="btn-primary">Accéder au dashboard</button>
-                    </div>
-                    <div class="login-footer">
-                        <span class="hint">Accès sécurisé • Chiffrement TLS 1.3</span>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Dashboard -->
-        <div id="dashboardScreen" class="screen">
-            <!-- Sidebar -->
-            <div class="sidebar" id="sidebar">
-                <div class="sidebar-header">
-                    <div class="logo-small">
-                        <span class="icon">🛡️</span>
-                        <span>Parental Pro</span>
-                    </div>
-                    <button class="menu-toggle" id="menuToggle">☰</button>
-                </div>
-                <div class="sidebar-nav" id="sidebarNav">
-                    <div class="nav-item" data-tab="dashboard">
-                        <span class="nav-icon">📊</span>
-                        <span>Dashboard</span>
-                    </div>
-                    <div class="nav-item" data-tab="children">
-                        <span class="nav-icon">👶</span>
-                        <span>Enfants</span>
-                    </div>
-                    <div class="nav-item" data-tab="rules">
-                        <span class="nav-icon">⏰</span>
-                        <span>Règles</span>
-                    </div>
-                    <div class="nav-item" data-tab="notifications">
-                        <span class="nav-icon">📱</span>
-                        <span>Notifications</span>
-                    </div>
-                </div>
-                <div class="sidebar-footer">
-                    <button onclick="logout()" class="logout-btn-sidebar">
-                        <span class="nav-icon">🚪</span>
-                        <span>Déconnexion</span>
-                    </button>
-                </div>
-            </div>
+<!-- ═══════════════════════════════════════════
+     LOGIN
+═══════════════════════════════════════════ -->
+<div id="login-screen" class="screen active">
+  <div class="login-bg">
+    <div class="login-orb orb-1"></div>
+    <div class="login-orb orb-2"></div>
+    <div class="login-grid"></div>
+  </div>
+  <div class="login-box">
+    <div class="login-logo">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <path d="M24 4L6 12V24C6 33.6 14.1 42.5 24 45C33.9 42.5 42 33.6 42 24V12L24 4Z" fill="url(#shield-grad)"/>
+        <path d="M18 24L22 28L30 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="shield-grad" x1="6" y1="4" x2="42" y2="45" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#C8FF00"/>
+            <stop offset="100%" stop-color="#7ADF00"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <h1 class="login-title">ParentShield</h1>
+    <p class="login-sub">Accès administrateur parent</p>
+    <div class="input-group">
+      <label class="input-label">MOT DE PASSE</label>
+      <input type="password" id="login-password" class="input" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button onclick="login()" class="btn-login" id="btn-login">
+      <span>Connexion</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+    <div id="login-error" class="login-error hidden">Mot de passe incorrect</div>
+  </div>
+</div>
 
-            <!-- Main Content -->
-            <div class="main-content">
-                <div class="top-bar">
-                    <div class="page-title">
-                        <h2 id="pageTitle">Tableau de bord</h2>
-                        <p id="pageSubtitle">Analyse du temps d'écran et activités</p>
-                    </div>
-                    <div class="top-bar-actions">
-                        <div class="child-selector-wrapper">
-                            <select id="childSelect" onchange="onChildSelect()">
-                                <option value="">Sélectionner un enfant</option>
-                            </select>
-                        </div>
-                        <button onclick="showAddChildModal()" class="btn-primary" id="actionButton">
-                            <span>+</span> Ajouter un enfant
-                        </button>
-                    </div>
-                </div>
+<!-- ═══════════════════════════════════════════
+     APP
+═══════════════════════════════════════════ -->
+<div id="app-screen" class="screen">
 
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">👶</div>
-                        <div class="stat-content">
-                            <h3>Enfants appairés</h3>
-                            <p id="totalChildren">0</p>
-                            <span class="stat-trend">appareils supervisés</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🔒</div>
-                        <div class="stat-content">
-                            <h3>Règles actives</h3>
-                            <p id="totalRules">0</p>
-                            <span class="stat-trend">configurées</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">⏱️</div>
-                        <div class="stat-content">
-                            <h3>Temps d'écran</h3>
-                            <p id="totalScreenTime">0h</p>
-                            <span class="stat-trend">aujourd'hui</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">💬</div>
-                        <div class="stat-content">
-                            <h3>Notifications</h3>
-                            <p id="totalNotifs">0</p>
-                            <span class="stat-trend">non lues</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Graphique -->
-                <div class="graph-section">
-                    <div class="graph-header">
-                        <h3>📊 Analyse du temps d'écran</h3>
-                        <div class="graph-tabs">
-                            <button class="graph-tab active" onclick="switchGraph('daily')">Journalier</button>
-                            <button class="graph-tab" onclick="switchGraph('weekly')">Hebdomadaire</button>
-                            <button class="graph-tab" onclick="switchGraph('apps')">Par application</button>
-                        </div>
-                    </div>
-                    <div class="graph-container">
-                        <canvas id="screenTimeChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Top Apps -->
-                <div class="section">
-                    <div class="section-header">
-                        <h3>📱 Applications les plus utilisées</h3>
-                        <button onclick="refreshTopApps()" class="btn-icon">⟳ Rafraîchir</button>
-                    </div>
-                    <div id="topAppsList" class="top-apps-list">
-                        <div class="empty-state">
-                            <span class="empty-icon">📱</span>
-                            <p>Sélectionnez un enfant pour voir les statistiques</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Enfants -->
-                <div id="childrenSection" class="section">
-                    <div class="section-header">
-                        <h3>👶 Liste des enfants appairés</h3>
-                        <button onclick="showAddChildModal()" class="btn-icon">+ Nouvel enfant</button>
-                    </div>
-                    <div id="childrenList" class="children-list">
-                        <div class="empty-state">
-                            <span class="empty-icon">👶</span>
-                            <p>Aucun enfant appairé</p>
-                            <button onclick="showAddChildModal()" class="btn-outline">Ajouter un enfant</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Règles (cachée) -->
-                <div id="rulesSection" class="section" style="display: none;">
-                    <div class="section-header">
-                        <h3>⏰ Règles de blocage</h3>
-                        <button onclick="showAddRuleModal()" class="btn-icon">+ Nouvelle règle</button>
-                    </div>
-                    <div id="rulesList" class="rules-list"></div>
-                </div>
-
-                <!-- Notifications (cachée) -->
-                <div id="notificationsSection" class="section" style="display: none;">
-                    <div class="section-header">
-                        <h3>📨 Flux de notifications</h3>
-                        <button onclick="loadNotifications()" class="btn-icon">⟳ Rafraîchir</button>
-                    </div>
-                    <div id="notificationsList" class="notifications-list"></div>
-                </div>
-            </div>
-        </div>
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
+        <path d="M24 4L6 12V24C6 33.6 14.1 42.5 24 45C33.9 42.5 42 33.6 42 24V12L24 4Z" fill="url(#sg2)"/>
+        <path d="M18 24L22 28L30 20" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="sg2" x1="6" y1="4" x2="42" y2="45" gradientUnits="userSpaceOnUse"><stop stop-color="#C8FF00"/><stop offset="1" stop-color="#7ADF00"/></linearGradient></defs>
+      </svg>
+      <span class="sidebar-brand">ParentShield</span>
+      <button class="sidebar-close" onclick="closeSidebar()">✕</button>
     </div>
 
-    <!-- Modals -->
-    <div id="addChildModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>➕ Ajouter un nouvel enfant</h3>
-                <button class="modal-close" onclick="closeAddChildModal()">×</button>
-            </div>
-            <form onsubmit="generatePairingCode(event)">
-                <div class="form-group">
-                    <label>Nom de l'enfant / appareil</label>
-                    <input type="text" id="childDeviceName" placeholder="Ex: Téléphone de Lucas" required>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" onclick="closeAddChildModal()" class="btn-secondary">Annuler</button>
-                    <button type="submit" class="btn-primary">Générer code d'appairage</button>
-                </div>
-            </form>
+    <div class="sidebar-section-label">NAVIGATION</div>
+    <nav>
+      <a class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+        <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+        Dashboard
+      </a>
+      <a class="nav-item" data-page="children" onclick="showPage('children')">
+        <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        Enfants
+        <span class="nav-badge" id="nav-badge-children"></span>
+      </a>
+      <a class="nav-item" data-page="notifications" onclick="showPage('notifications')">
+        <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        Messages
+        <span class="nav-badge" id="nav-badge-notif"></span>
+      </a>
+      <a class="nav-item" data-page="rules" onclick="showPage('rules')">
+        <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
+        Règles de blocage
+      </a>
+      <a class="nav-item" data-page="location" onclick="showPage('location')">
+        <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+        Localisation
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-section-label">COMPTE</div>
+      <button onclick="logout()" class="nav-item nav-logout">
+        <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+        Déconnexion
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" onclick="openSidebar()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h2 id="page-title">Dashboard</h2>
+      <div id="child-selector-wrap" class="child-selector-wrap hidden">
+        <select id="child-selector" class="child-select" onchange="onChildChange()">
+          <option value="">— Enfant —</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- ── DASHBOARD ── -->
+    <div id="page-dashboard" class="page active">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-label">ENFANTS SUIVIS</span>
+            <span class="kpi-icon kpi-green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+          </div>
+          <div class="kpi-value" id="stat-children">—</div>
+          <div class="kpi-sub" id="stat-children-online"></div>
         </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-label">RÈGLES ACTIVES</span>
+            <span class="kpi-icon kpi-blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span>
+          </div>
+          <div class="kpi-value" id="stat-rules">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-label">NON LUES</span>
+            <span class="kpi-icon kpi-orange"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          </div>
+          <div class="kpi-value" id="stat-unread">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-top">
+            <span class="kpi-label">ÉCRAN AUJOURD'HUI</span>
+            <span class="kpi-icon kpi-purple"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          </div>
+          <div class="kpi-value" id="stat-screen-time">—</div>
+        </div>
+      </div>
+
+      <div class="dash-row">
+        <div class="panel panel-chart">
+          <div class="panel-header">
+            <h3>Temps d'écran</h3>
+            <div class="period-tabs">
+              <button class="period-tab active" data-period="day" onclick="setPeriod('day',this)">Jour</button>
+              <button class="period-tab" data-period="week" onclick="setPeriod('week',this)">Semaine</button>
+              <button class="period-tab" data-period="month" onclick="setPeriod('month',this)">Mois</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-screentime"></canvas></div>
+        </div>
+        <div class="panel panel-apps">
+          <div class="panel-header"><h3>Top Applications</h3></div>
+          <ul id="top-apps-list" class="apps-list"></ul>
+        </div>
+      </div>
     </div>
 
-    <div id="pairingCodeModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>🔑 Code d'appairage</h3>
-                <button class="modal-close" onclick="closePairingCodeModal()">×</button>
-            </div>
-            <div class="pairing-code-container">
-                <p>Sur l'appareil de l'enfant, saisissez ce code :</p>
-                <div class="pairing-code" id="pairingCodeDisplay">000000</div>
-                <p class="code-hint">⏱️ Code valable 10 minutes</p>
-                <div class="code-instructions">
-                    <h4>📱 Instructions :</h4>
-                    <ol>
-                        <li>Installer l'application Parental Control sur le téléphone de l'enfant</li>
-                        <li>Ouvrir l'application et cliquer sur "S'appairer"</li>
-                        <li>Saisir le code ci-dessus</li>
-                        <li>Accepter les permissions demandées</li>
-                    </ol>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button onclick="copyPairingCode()" class="btn-secondary">📋 Copier le code</button>
-                <button onclick="closePairingCodeModal()" class="btn-primary">Fermer</button>
-            </div>
-        </div>
+    <!-- ── CHILDREN ── -->
+    <div id="page-children" class="page">
+      <div class="page-toolbar">
+        <button class="btn-primary" onclick="showAddChild()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ajouter un enfant
+        </button>
+      </div>
+      <div class="panel">
+        <table class="table">
+          <thead><tr><th>NOM</th><th>STATUT</th><th>DERNIÈRE ACTIVITÉ</th><th>ACTIONS</th></tr></thead>
+          <tbody id="children-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
-    <div id="ruleModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="ruleModalTitle">Créer une règle de blocage</h3>
-                <button class="modal-close" onclick="closeRuleModal()">×</button>
-            </div>
-            <form onsubmit="submitRule(event)">
-                <div class="form-group">
-                    <label>Enfant</label>
-                    <select id="ruleChildId" required>
-                        <option value="">Sélectionner un enfant</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Jour</label>
-                    <select id="ruleDay" required>
-                        <option value="0">Dimanche</option><option value="1">Lundi</option><option value="2">Mardi</option>
-                        <option value="3">Mercredi</option><option value="4">Jeudi</option><option value="5">Vendredi</option>
-                        <option value="6">Samedi</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Début</label>
-                        <input type="time" id="ruleStart" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Fin</label>
-                        <input type="time" id="ruleEnd" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Application (optionnel)</label>
-                    <input type="text" id="ruleApp" placeholder="ex: com.whatsapp">
-                    <small>Laisser vide pour toutes les applications</small>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" onclick="closeRuleModal()" class="btn-secondary">Annuler</button>
-                    <button type="submit" class="btn-primary">Valider</button>
-                </div>
-            </form>
-        </div>
+    <!-- ── NOTIFICATIONS ── -->
+    <div id="page-notifications" class="page">
+      <div class="page-toolbar">
+        <button class="btn-ghost" onclick="markAllRead()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Tout marquer comme lu
+        </button>
+      </div>
+      <div id="convs-list"></div>
     </div>
 
-    <script src="app.js"></script>
-    <script>
-        // Menu toggle for mobile
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebarNav = document.getElementById('sidebarNav');
-        const sidebar = document.getElementById('sidebar');
-        if (menuToggle) {
-            menuToggle.addEventListener('click', () => {
-                sidebarNav.classList.toggle('open');
-                sidebar.classList.toggle('open');
-            });
-        }
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', () => {
-                if (window.innerWidth <= 768) {
-                    sidebarNav.classList.remove('open');
-                    sidebar.classList.remove('open');
-                }
-            });
-        });
-    </script>
+    <!-- ── RULES ── -->
+    <div id="page-rules" class="page">
+      <div class="page-toolbar">
+        <button class="btn-primary" onclick="showAddRule()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ajouter une règle
+        </button>
+      </div>
+      <div class="panel">
+        <table class="table">
+          <thead><tr><th>JOUR</th><th>HORAIRE</th><th>APPLICATION</th><th>STATUT</th><th>ACTIONS</th></tr></thead>
+          <tbody id="rules-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── LOCATION ── -->
+    <div id="page-location" class="page">
+      <div class="panel" style="padding:0;overflow:hidden">
+        <div id="map" style="height:480px"></div>
+      </div>
+      <div class="loc-meta" id="loc-meta"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════════════════════════════════
+     MODAL
+═══════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-x" onclick="closeModal()">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
