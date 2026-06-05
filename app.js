@@ -199,32 +199,28 @@ async function loadDashboard() {
   await loadTopApps();
   if (currentChildId) loadChartData('day');
 }
-
 async function loadTopApps() {
   const container = document.getElementById('top-apps-list');
   if (!currentChildId) {
     container.innerHTML = '<li>Aucun enfant sélectionné</li>';
     return;
   }
-  const data = await api('GET', `/admin/children/${currentChildId}/notifications?limit=500`);
-  if (!data?.notifications) {
-    container.innerHTML = '<li>Aucune notification</li>';
-    return;
+  try {
+    const data = await api('GET', `/admin/children/${currentChildId}/top-apps?days=7`);
+    if (!data?.apps || data.apps.length === 0) {
+      container.innerHTML = '<li>Aucune donnée de temps d\'écran</li>';
+      return;
+    }
+    container.innerHTML = data.apps.map(app => `
+      <li>
+        <span class="app-name">${appIcon(app.app_name)} ${app.app_name}</span>
+        <span class="app-pill">${fmtDuration(app.total_seconds)}</span>
+      </li>
+    `).join('');
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = '<li>Erreur chargement</li>';
   }
-  const notifs = data.notifications;
-  const appCount = new Map();
-  notifs.forEach(n => {
-    const app = n.app_name || 'Inconnu';
-    appCount.set(app, (appCount.get(app) || 0) + 1);
-  });
-  const sorted = Array.from(appCount.entries()).sort((a,b) => b[1] - a[1]).slice(0,5);
-  if (sorted.length === 0) {
-    container.innerHTML = '<li>Aucune donnée</li>';
-    return;
-  }
-  container.innerHTML = sorted.map(([app, count]) => `
-    <li><span class="app-name">${appIcon(app)} ${app}</span><span class="app-pill">${count}</span></li>
-  `).join('');
 }
 
 // ============================================================
@@ -680,9 +676,12 @@ window.closeSidebar = function() {
 // ============================================================
 function fmtDuration(sec) {
   if (!sec) return '0 min';
-  const h = Math.floor(sec/3600);
-  const m = Math.floor((sec%3600)/60);
-  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m} min`;
+  return `${s} sec`;
 }
 
 function timeAgo(dateStr) {
