@@ -14,9 +14,7 @@
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════
-     LOGIN
-═══════════════════════════════════════════ -->
+<!-- LOGIN -->
 <div id="login-screen" class="screen active">
   <div class="login-bg">
     <div class="login-orb orb-1"></div>
@@ -50,9 +48,7 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════
-     APP
-═══════════════════════════════════════════ -->
+<!-- APP -->
 <div id="app-screen" class="screen">
 
   <!-- SIDEBAR -->
@@ -91,6 +87,10 @@
         <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
         Localisation
       </a>
+      <a class="nav-item" data-page="settings" onclick="showPage('settings')">
+        <span class="nav-icon">⚙️</span>
+        <span>Paramètres</span>
+      </a>
     </nav>
 
     <div class="sidebar-bottom">
@@ -117,7 +117,7 @@
       </div>
     </header>
 
-    <!-- ── DASHBOARD ── -->
+    <!-- DASHBOARD -->
     <div id="page-dashboard" class="page active">
       <div class="kpi-grid">
         <div class="kpi-card">
@@ -170,7 +170,7 @@
       </div>
     </div>
 
-    <!-- ── CHILDREN ── -->
+    <!-- ENFANTS -->
     <div id="page-children" class="page">
       <div class="page-toolbar">
         <button class="btn-primary" onclick="showAddChild()">
@@ -186,7 +186,7 @@
       </div>
     </div>
 
-    <!-- ── NOTIFICATIONS ── -->
+    <!-- NOTIFICATIONS -->
     <div id="page-notifications" class="page">
       <div class="page-toolbar">
         <button class="btn-ghost" onclick="markAllRead()">
@@ -197,7 +197,7 @@
       <div id="convs-list"></div>
     </div>
 
-    <!-- ── RULES ── -->
+    <!-- RÈGLES -->
     <div id="page-rules" class="page">
       <div class="page-toolbar">
         <button class="btn-primary" onclick="showAddRule()">
@@ -213,7 +213,7 @@
       </div>
     </div>
 
-    <!-- ── LOCATION ── -->
+    <!-- LOCALISATION -->
     <div id="page-location" class="page">
       <div class="panel" style="padding:0;overflow:hidden">
         <div id="map" style="height:480px"></div>
@@ -221,12 +221,21 @@
       <div class="loc-meta" id="loc-meta"></div>
     </div>
 
+    <!-- PARAMÈTRES -->
+    <div id="page-settings" class="page">
+      <div class="page-toolbar">
+        <h2 style="color: var(--accent);">Administration</h2>
+      </div>
+      <div class="panel" style="text-align: center; padding: 32px;">
+        <p style="margin-bottom: 24px;">⚠️ La réinitialisation supprimera tous les enfants, toutes les notifications et toutes les règles. Cette action est irréversible.</p>
+        <button class="btn-primary" style="background: #ef4444; border-color: #ef4444;" onclick="resetAllData()">Réinitialiser tout</button>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app -->
 
-<!-- ═══════════════════════════════════════════
-     MODAL
-═══════════════════════════════════════════ -->
+<!-- MODAL -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
   <div class="modal" onclick="event.stopPropagation()">
     <button class="modal-x" onclick="closeModal()">✕</button>
