@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const API_URL = 'https://john-dbfu.onrender.com/api';  // ← préfixe /api inclus
+const API_URL = 'https://john-dbfu.onrender.com/api';
 let token = localStorage.getItem('ps_token') || null;
 let currentChildId = null;
 let currentPage = 'dashboard';
@@ -35,7 +35,7 @@ function showNetworkError() {
     t = document.createElement('div');
     t.id = 'net-toast';
     t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1a2332;border:1px solid rgba(248,113,113,0.3);color:#F87171;padding:12px 18px;border-radius:10px;font-size:13px;z-index:9999;';
-    t.textContent = '⚠️  Impossible de joindre le serveur';
+    t.textContent = '⚠️ Impossible de joindre le serveur';
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 5000);
   }
@@ -155,65 +155,6 @@ function refreshPage() {
   else if (currentPage === 'notifications') loadNotifications();
   else if (currentPage === 'rules') loadRules();
   else if (currentPage === 'location') loadLocation();
-  // settings n'a pas de chargement particulier
-}
-
-// ============================================================
-// LOCALISATION (CORRIGÉE)
-// ============================================================
-async function loadLocation() {
-  const meta = document.getElementById('loc-meta');
-  if (!currentChildId) {
-    meta.innerHTML = '<span class="loc-chip">📍 Sélectionnez un enfant</span>';
-    if (mapInstance) mapInstance.remove();
-    return;
-  }
-
-  // Récupère la dernière localisation (stockée dans connection_logs)
-  const data = await api('GET', `/child/location/${currentChildId}`);
-  if (!data || !data.location) {
-    meta.innerHTML = '<span class="loc-chip">📍 Aucune position reçue</span>';
-    if (mapInstance) mapInstance.remove();
-    return;
-  }
-
-  const loc = data.location;
-  const lat = parseFloat(loc.latitude);
-  const lng = parseFloat(loc.longitude);
-  const accuracy = loc.accuracy || 0;
-  const battery = loc.battery_level || 0;
-  const timestamp = loc.timestamp ? new Date(loc.timestamp) : new Date();
-
-  if (!mapInstance) {
-    mapInstance = L.map('map', { zoomControl: true }).setView([lat, lng], 15);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '©OpenStreetMap ©CARTO',
-      maxZoom: 19
-    }).addTo(mapInstance);
-  } else {
-    mapInstance.setView([lat, lng], 15);
-  }
-
-  if (mapMarker) mapMarker.remove();
-  const icon = L.divIcon({
-    html: `<div style="width:14px;height:14px;background:#C8FF00;border-radius:50%;border:3px solid #0D1117;box-shadow:0 0 16px rgba(200,255,0,0.7)"></div>`,
-    className: '', iconSize: [14,14], iconAnchor: [7,7]
-  });
-  mapMarker = L.marker([lat, lng], { icon }).addTo(mapInstance);
-  mapMarker.bindPopup(`
-    <div style="font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6">
-      <strong>${document.querySelector('#child-selector option:checked')?.textContent || 'Enfant'}</strong><br>
-      🕐 ${timestamp.toLocaleString('fr-FR')}<br>
-      🔋 ${battery}% · 📡 ±${Math.round(accuracy)}m
-    </div>
-  `).openPopup();
-
-  meta.innerHTML = `
-    <span class="loc-chip">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-    <span class="loc-chip">🕐 ${timeAgo(timestamp)}</span>
-    <span class="loc-chip">🔋 ${battery}%</span>
-    <span class="loc-chip">📡 ±${Math.round(accuracy)}m</span>
-  `;
 }
 
 // ============================================================
@@ -224,7 +165,6 @@ async function loadDashboard() {
   const children = childrenData?.children || [];
   document.getElementById('stat-children').textContent = children.length;
 
-  // Nombre total de règles actives
   let activeRulesCount = 0;
   for (const child of children) {
     const rulesData = await api('GET', `/admin/rules/${child.id}`);
@@ -240,34 +180,108 @@ async function loadDashboard() {
   document.getElementById('stat-unread').textContent = unread;
   setBadge('nav-badge-notif', unread);
 
-  const child = children.find(c => c.id === currentChildId);
-  const screenSec = child?.screen_time || 0;
-  document.getElementById('stat-screen-time').textContent = fmtDuration(screenSec);
+  let screenMinutes = 0;
+  if (currentChildId) {
+    const child = children.find(c => c.id === currentChildId);
+    if (child && child.screen_time) {
+      screenMinutes = Math.floor(child.screen_time / 60);
+    } else {
+      const notifsToday = await api('GET', `/admin/children/${currentChildId}/notifications?limit=1000`);
+      if (notifsToday?.notifications) {
+        const today = new Date().toISOString().slice(0,10);
+        const todayNotifs = notifsToday.notifications.filter(n => n.timestamp.startsWith(today));
+        screenMinutes = todayNotifs.length * 5;
+      }
+    }
+  }
+  document.getElementById('stat-screen-time').textContent = fmtDuration(screenMinutes * 60);
 
-  if (currentChildId) loadChartData();
+  await loadTopApps();
+  if (currentChildId) loadChartData('day');
 }
 
-async function loadChartData() {
-  if (!currentChildId) return;
+async function loadTopApps() {
+  const container = document.getElementById('top-apps-list');
+  if (!currentChildId) {
+    container.innerHTML = '<li>Aucun enfant sélectionné</li>';
+    return;
+  }
   const data = await api('GET', `/admin/children/${currentChildId}/notifications?limit=500`);
+  if (!data?.notifications) {
+    container.innerHTML = '<li>Aucune notification</li>';
+    return;
+  }
+  const notifs = data.notifications;
+  const appCount = new Map();
+  notifs.forEach(n => {
+    const app = n.app_name || 'Inconnu';
+    appCount.set(app, (appCount.get(app) || 0) + 1);
+  });
+  const sorted = Array.from(appCount.entries()).sort((a,b) => b[1] - a[1]).slice(0,5);
+  if (sorted.length === 0) {
+    container.innerHTML = '<li>Aucune donnée</li>';
+    return;
+  }
+  container.innerHTML = sorted.map(([app, count]) => `
+    <li><span class="app-name">${appIcon(app)} ${app}</span><span class="app-pill">${count}</span></li>
+  `).join('');
+}
+
+// ============================================================
+// GRAPHIQUE
+// ============================================================
+async function loadChartData(period = 'day') {
+  if (!currentChildId) return;
+  const data = await api('GET', `/admin/children/${currentChildId}/notifications?limit=2000`);
   if (!data?.notifications) return;
   const notifs = data.notifications;
-  const last7 = new Date();
-  last7.setDate(last7.getDate() - 7);
-  const filtered = notifs.filter(n => new Date(n.timestamp) >= last7);
-  const byDay = {};
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0,10);
-    byDay[key] = 0;
+
+  let labels = [], values = [];
+  const now = new Date();
+
+  if (period === 'day') {
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(now.getDate() - i);
+      const key = d.toISOString().slice(0,10);
+      labels.push(key.slice(5));
+      const count = notifs.filter(n => n.timestamp.startsWith(key)).length;
+      values.push(count);
+    }
+  } else if (period === 'week') {
+    for (let i = 3; i >= 0; i--) {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay() - i*7);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const label = `${start.getDate()}/${start.getMonth()+1} – ${end.getDate()}/${end.getMonth()+1}`;
+      labels.push(label);
+      const count = notifs.filter(n => {
+        const d = new Date(n.timestamp);
+        return d >= start && d <= end;
+      }).length;
+      values.push(count);
+    }
+  } else if (period === 'month') {
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleString('fr-FR', { month: 'short' });
+      labels.push(label);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      const count = notifs.filter(n => {
+        const nd = new Date(n.timestamp);
+        return nd >= start && nd <= end;
+      }).length;
+      values.push(count);
+    }
   }
-  filtered.forEach(n => {
-    const day = n.timestamp.slice(0,10);
-    if (byDay[day] !== undefined) byDay[day]++;
-  });
-  const labels = Object.keys(byDay).sort();
-  const values = labels.map(l => byDay[l]);
   renderChart(labels, values);
+}
+
+function setPeriod(period, btn) {
+  document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadChartData(period);
 }
 
 function renderChart(labels, values) {
@@ -289,7 +303,7 @@ function renderChart(labels, values) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.raw} notifications` } } },
       scales: {
         x: { ticks: { color: '#4A5A72' } },
         y: { beginAtZero: true, ticks: { color: '#4A5A72' } }
@@ -443,7 +457,7 @@ window.markAllRead = async function() {
 };
 
 // ============================================================
-// RÈGLES
+// RÈGLES DE BLOCAGE
 // ============================================================
 async function loadRules() {
   const tb = document.getElementById('rules-tbody');
@@ -453,7 +467,7 @@ async function loadRules() {
   const rules = data.rules;
   tb.innerHTML = '';
   if (!rules.length) {
-    tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>';
+    tb.innerHTML='<td><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>';
     return;
   }
   const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -469,7 +483,7 @@ async function loadRules() {
           <button class="btn-icon" onclick="editRule(${r.id})">✏️</button>
           <button class="btn-icon danger" onclick="deleteRule(${r.id})">🗑️</button>
         </div>
-      </td>`;
+      </tr>`;
     tb.appendChild(tr);
   }
 }
@@ -559,6 +573,63 @@ window.deleteRule = async function(ruleId) {
 };
 
 // ============================================================
+// LOCALISATION (avec carte Leaflet – intacte)
+// ============================================================
+async function loadLocation() {
+  const meta = document.getElementById('loc-meta');
+  if (!currentChildId) {
+    meta.innerHTML = '<span class="loc-chip">📍 Sélectionnez un enfant</span>';
+    if (mapInstance) mapInstance.remove();
+    return;
+  }
+
+  const data = await api('GET', `/child/location/${currentChildId}`);
+  if (!data || !data.location) {
+    meta.innerHTML = '<span class="loc-chip">📍 Aucune position reçue</span>';
+    if (mapInstance) mapInstance.remove();
+    return;
+  }
+
+  const loc = data.location;
+  const lat = parseFloat(loc.latitude);
+  const lng = parseFloat(loc.longitude);
+  const accuracy = loc.accuracy || 0;
+  const battery = loc.battery_level || 0;
+  const timestamp = loc.timestamp ? new Date(loc.timestamp) : new Date();
+
+  if (!mapInstance) {
+    mapInstance = L.map('map', { zoomControl: true }).setView([lat, lng], 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '©OpenStreetMap ©CARTO',
+      maxZoom: 19
+    }).addTo(mapInstance);
+  } else {
+    mapInstance.setView([lat, lng], 15);
+  }
+
+  if (mapMarker) mapMarker.remove();
+  const icon = L.divIcon({
+    html: `<div style="width:14px;height:14px;background:#C8FF00;border-radius:50%;border:3px solid #0D1117;box-shadow:0 0 16px rgba(200,255,0,0.7)"></div>`,
+    className: '', iconSize: [14,14], iconAnchor: [7,7]
+  });
+  mapMarker = L.marker([lat, lng], { icon }).addTo(mapInstance);
+  mapMarker.bindPopup(`
+    <div style="font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6">
+      <strong>${document.querySelector('#child-selector option:checked')?.textContent || 'Enfant'}</strong><br>
+      🕐 ${timestamp.toLocaleString('fr-FR')}<br>
+      🔋 ${battery}% · 📡 ±${Math.round(accuracy)}m
+    </div>
+  `).openPopup();
+
+  meta.innerHTML = `
+    <span class="loc-chip">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+    <span class="loc-chip">🕐 ${timeAgo(timestamp)}</span>
+    <span class="loc-chip">🔋 ${battery}%</span>
+    <span class="loc-chip">📡 ±${Math.round(accuracy)}m</span>
+  `;
+}
+
+// ============================================================
 // MODAL
 // ============================================================
 function openModal(html) {
@@ -570,11 +641,10 @@ function closeModal() {
 }
 
 // ============================================================
-// RÉINITIALISATION DES MESSAGES (URL corrigée)
+// RÉINITIALISATION DES MESSAGES
 // ============================================================
 async function resetMessages() {
   if (!confirm("⚠️ Êtes-vous sûr ?\n\nCette action supprimera TOUS les messages (notifications) de tous les enfants.\n\nLes enfants et les règles de blocage seront conservés.")) return;
-
   try {
     const res = await fetch(`${API_URL}/admin/reset-messages`, {
       method: 'DELETE',
@@ -591,7 +661,6 @@ async function resetMessages() {
     alert("Erreur réseau : " + err.message);
   }
 }
-
 window.resetMessages = resetMessages;
 
 // ============================================================
