@@ -1,11 +1,13 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const API_URL = 'https://john-dbfu.onrender.com/api';  // ← contient déjà /api
+const API_URL = 'https://john-dbfu.onrender.com/api';  // ← préfixe /api inclus
 let token = localStorage.getItem('ps_token') || null;
 let currentChildId = null;
 let currentPage = 'dashboard';
 let chartInstance = null;
+let mapInstance = null;
+let mapMarker = null;
 
 // ============================================================
 // API HELPER
@@ -40,7 +42,7 @@ function showNetworkError() {
 }
 
 // ============================================================
-// AUTHENTIFICATION (globales)
+// AUTHENTIFICATION
 // ============================================================
 window.login = async function() {
   const pw = document.getElementById('login-password').value;
@@ -152,7 +154,66 @@ function refreshPage() {
   if (currentPage === 'dashboard') loadDashboard();
   else if (currentPage === 'notifications') loadNotifications();
   else if (currentPage === 'rules') loadRules();
-  else if (currentPage === 'location') document.getElementById('loc-meta').innerHTML = '<span class="loc-chip">📍 Localisation non disponible</span>';
+  else if (currentPage === 'location') loadLocation();
+  // settings n'a pas de chargement particulier
+}
+
+// ============================================================
+// LOCALISATION (CORRIGÉE)
+// ============================================================
+async function loadLocation() {
+  const meta = document.getElementById('loc-meta');
+  if (!currentChildId) {
+    meta.innerHTML = '<span class="loc-chip">📍 Sélectionnez un enfant</span>';
+    if (mapInstance) mapInstance.remove();
+    return;
+  }
+
+  // Récupère la dernière localisation (stockée dans connection_logs)
+  const data = await api('GET', `/child/location/${currentChildId}`);
+  if (!data || !data.location) {
+    meta.innerHTML = '<span class="loc-chip">📍 Aucune position reçue</span>';
+    if (mapInstance) mapInstance.remove();
+    return;
+  }
+
+  const loc = data.location;
+  const lat = parseFloat(loc.latitude);
+  const lng = parseFloat(loc.longitude);
+  const accuracy = loc.accuracy || 0;
+  const battery = loc.battery_level || 0;
+  const timestamp = loc.timestamp ? new Date(loc.timestamp) : new Date();
+
+  if (!mapInstance) {
+    mapInstance = L.map('map', { zoomControl: true }).setView([lat, lng], 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '©OpenStreetMap ©CARTO',
+      maxZoom: 19
+    }).addTo(mapInstance);
+  } else {
+    mapInstance.setView([lat, lng], 15);
+  }
+
+  if (mapMarker) mapMarker.remove();
+  const icon = L.divIcon({
+    html: `<div style="width:14px;height:14px;background:#C8FF00;border-radius:50%;border:3px solid #0D1117;box-shadow:0 0 16px rgba(200,255,0,0.7)"></div>`,
+    className: '', iconSize: [14,14], iconAnchor: [7,7]
+  });
+  mapMarker = L.marker([lat, lng], { icon }).addTo(mapInstance);
+  mapMarker.bindPopup(`
+    <div style="font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6">
+      <strong>${document.querySelector('#child-selector option:checked')?.textContent || 'Enfant'}</strong><br>
+      🕐 ${timestamp.toLocaleString('fr-FR')}<br>
+      🔋 ${battery}% · 📡 ±${Math.round(accuracy)}m
+    </div>
+  `).openPopup();
+
+  meta.innerHTML = `
+    <span class="loc-chip">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+    <span class="loc-chip">🕐 ${timeAgo(timestamp)}</span>
+    <span class="loc-chip">🔋 ${battery}%</span>
+    <span class="loc-chip">📡 ±${Math.round(accuracy)}m</span>
+  `;
 }
 
 // ============================================================
@@ -163,7 +224,7 @@ async function loadDashboard() {
   const children = childrenData?.children || [];
   document.getElementById('stat-children').textContent = children.length;
 
-  // Récupération du nombre de règles actives (tous enfants confondus)
+  // Nombre total de règles actives
   let activeRulesCount = 0;
   for (const child of children) {
     const rulesData = await api('GET', `/admin/rules/${child.id}`);
@@ -388,11 +449,11 @@ async function loadRules() {
   const tb = document.getElementById('rules-tbody');
   if (!currentChildId) { tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Sélectionnez un enfant</div></td></tr>'; return; }
   const data = await api('GET', `/admin/rules/${currentChildId}`);
-  if (!data?.rules) { tb.innerHTML='<td><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>'; return; }
+  if (!data?.rules) { tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>'; return; }
   const rules = data.rules;
   tb.innerHTML = '';
   if (!rules.length) {
-    tb.innerHTML='<td><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>';
     return;
   }
   const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -509,13 +570,12 @@ function closeModal() {
 }
 
 // ============================================================
-// RÉINITIALISER UNIQUEMENT LES MESSAGES (correction de l'URL)
+// RÉINITIALISATION DES MESSAGES (URL corrigée)
 // ============================================================
 async function resetMessages() {
   if (!confirm("⚠️ Êtes-vous sûr ?\n\nCette action supprimera TOUS les messages (notifications) de tous les enfants.\n\nLes enfants et les règles de blocage seront conservés.")) return;
 
   try {
-    // ICI : on n'ajoute PAS /api car API_URL le contient déjà
     const res = await fetch(`${API_URL}/admin/reset-messages`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
