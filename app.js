@@ -504,31 +504,6 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
 
-
-// ============================================================
-// RÉINITIALISATION TOTALE
-// ============================================================
-async function resetAllData() {
-  if (!confirm("⚠️ Êtes-vous absolument sûr ?\n\nCette action supprimera TOUS les enfants, TOUTES les notifications et TOUTES les règles.\n\nCette opération est irréversible.")) return;
-  if (!confirm("Dernier avertissement : toutes les données seront effacées définitivement. Voulez-vous vraiment continuer ?")) return;
-
-  try {
-    const res = await fetch(`${API_URL}/api/admin/reset-all`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) {
-      alert("✅ Toutes les données ont été réinitialisées.");
-      location.reload();
-    } else {
-      const err = await res.json();
-      alert("Erreur : " + (err.error || "Impossible de réinitialiser"));
-    }
-  } catch (err) {
-    alert("Erreur réseau : " + err.message);
-  }
-}
-
 // ============================================================
 // RÉINITIALISER UNIQUEMENT LES MESSAGES
 // ============================================================
