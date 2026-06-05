@@ -1,6 +1,5 @@
 // ============ CONFIGURATION ============
-const API_URL = 'https://john-dbfu.onrender.com';  // ← Remplacez par l'URL de votre backend Render
-
+const API_URL = 'https://john-dbfu.onrender.com';
 let adminToken = null;
 let currentChildId = null;
 let currentTab = 'dashboard';
@@ -28,12 +27,15 @@ window.login = async function() {
         if (res.ok && data.token) {
             adminToken = data.token;
             localStorage.setItem('adminToken', adminToken);
-            document.getElementById('loginScreen').classList.remove('active');
-            document.getElementById('dashboardScreen').classList.add('active');
+            // Passer au dashboard
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboardScreen').style.display = 'block';
             setupNavigation();
             initChart();
             loadAllData();
-        } else alert('Mot de passe incorrect');
+        } else {
+            alert('Mot de passe incorrect');
+        }
     } catch (err) {
         console.error(err);
         alert('Erreur réseau');
@@ -41,15 +43,15 @@ window.login = async function() {
 };
 
 function showDashboard() {
-    document.getElementById('loginScreen').classList.remove('active');
-    document.getElementById('dashboardScreen').classList.add('active');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
 }
 
 window.logout = function() {
     localStorage.removeItem('adminToken');
     adminToken = null;
-    document.getElementById('loginScreen').classList.add('active');
-    document.getElementById('dashboardScreen').classList.remove('active');
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('dashboardScreen').style.display = 'none';
 };
 
 // ============ NAVIGATION ============
@@ -64,6 +66,7 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`.nav-item[data-tab="${tab}"]`).classList.add('active');
     
+    // Cacher toutes les sections
     document.getElementById('childrenSection').style.display = 'none';
     document.getElementById('rulesSection').style.display = 'none';
     document.getElementById('notificationsSection').style.display = 'none';
@@ -71,6 +74,7 @@ function switchTab(tab) {
     if (tab === 'dashboard') {
         document.getElementById('childrenSection').style.display = 'block';
         document.getElementById('pageTitle').innerText = 'Tableau de bord';
+        document.getElementById('pageSubtitle').innerText = 'Analyse du temps d\'écran et activités';
         if (currentChildId) {
             loadStats();
             loadTopApps();
@@ -78,15 +82,18 @@ function switchTab(tab) {
     } else if (tab === 'children') {
         document.getElementById('childrenSection').style.display = 'block';
         document.getElementById('pageTitle').innerText = 'Gestion des enfants';
+        document.getElementById('pageSubtitle').innerText = 'Ajoutez et supervisez les appareils';
         loadChildren();
     } else if (tab === 'rules') {
         document.getElementById('rulesSection').style.display = 'block';
         document.getElementById('pageTitle').innerText = 'Règles de blocage';
+        document.getElementById('pageSubtitle').innerText = 'Définissez les plages horaires';
         if (currentChildId) loadRules();
         else document.getElementById('rulesList').innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>';
     } else if (tab === 'notifications') {
         document.getElementById('notificationsSection').style.display = 'block';
-        document.getElementById('pageTitle').innerText = 'Notifications';
+        document.getElementById('pageTitle').innerText = 'Flux de notifications';
+        document.getElementById('pageSubtitle').innerText = 'Consultez l\'activité en temps réel';
         if (currentChildId) loadNotifications();
         else document.getElementById('notificationsList').innerHTML = '<div class="empty-state">Sélectionnez un enfant</div>';
     }
@@ -136,7 +143,7 @@ async function loadChildren() {
             <div class="child-card" onclick="selectChild('${c.id}')">
                 <div><strong>${c.device_name}</strong><br><small>ID: ${c.id.substring(0,8)}</small></div>
                 <div class="child-actions">
-                    <button class="btn-icon-small" onclick="event.stopPropagation(); viewChildStats('${c.id}')">📊 Stats</button>
+                    <button class="btn-icon-small" onclick="event.stopPropagation(); viewChildStats('${c.id}')">📊 Voir stats</button>
                     <button class="btn-icon-small" onclick="event.stopPropagation(); deleteChild('${c.id}')">🗑️ Supprimer</button>
                 </div>
             </div>
@@ -228,16 +235,16 @@ async function loadRules() {
         const rules = data.rules || [];
         const container = document.getElementById('rulesList');
         if (!rules.length) {
-            container.innerHTML = '<div class="empty-state">Aucune règle</div>';
+            container.innerHTML = '<div class="empty-state">Aucune règle configurée</div>';
             return;
         }
-        const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+        const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
         container.innerHTML = rules.map(r => `
             <div class="rule-item">
-                <div>${days[r.day_of_week]} ${String(r.start_hour).padStart(2,'0')}:${String(r.start_minute).padStart(2,'0')} → ${String(r.end_hour).padStart(2,'0')}:${String(r.end_minute).padStart(2,'0')} ${r.app_package ? `(${r.app_package})` : '(toutes)'}</div>
+                <div>${days[r.day_of_week]} ${String(r.start_hour).padStart(2,'0')}:${String(r.start_minute).padStart(2,'0')} → ${String(r.end_hour).padStart(2,'0')}:${String(r.end_minute).padStart(2,'0')} ${r.app_package ? `(${r.app_package})` : '(toutes les applis)'}</div>
                 <div class="child-actions">
-                    <button class="btn-icon-small" onclick="editRule(${r.id})">✏️</button>
-                    <button class="btn-icon-small" onclick="deleteRule(${r.id})">🗑️</button>
+                    <button class="btn-icon-small" onclick="editRule(${r.id})">✏️ Modifier</button>
+                    <button class="btn-icon-small" onclick="deleteRule(${r.id})">🗑️ Supprimer</button>
                 </div>
             </div>
         `).join('');
@@ -328,7 +335,7 @@ async function loadNotifications() {
         const data = await res.json();
         let notifs = data.notifications || [];
         if (!notifs.length) {
-            document.getElementById('notificationsList').innerHTML = '<div class="empty-state">Aucune notification</div>';
+            document.getElementById('notificationsList').innerHTML = '<div class="empty-state">Aucune notification reçue</div>';
             return;
         }
         notifs.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -352,7 +359,7 @@ async function loadNotifications() {
                     <div class="conversation-messages" id="conv-${contact.replace(/[^a-z0-9]/gi, '_')}" style="display:none;">
                         ${msgs.map(m => `
                             <div class="notification-item" onclick="markAsRead(${m.id})">
-                                <div><strong>${m.type === 'outgoing' ? '➡️' : '⬅️'} ${m.app_name}</strong> <small>${new Date(m.timestamp).toLocaleString()}</small></div>
+                                <div><strong>${m.type === 'outgoing' ? '➡️ Envoyé' : '⬅️ Reçu'} via ${m.app_name}</strong> <small>${new Date(m.timestamp).toLocaleString()}</small></div>
                                 <div class="notification-content">${m.content || ''}</div>
                             </div>
                         `).join('')}
@@ -397,7 +404,7 @@ async function loadTopApps() {
         notifs.forEach(n => { appCount[n.app_name] = (appCount[n.app_name] || 0) + 1; });
         const sorted = Object.entries(appCount).sort((a,b) => b[1] - a[1]).slice(0,5);
         const total = notifs.length;
-        const html = sorted.map(([app, count]) => `<div style="margin-bottom:8px;"><strong>${app}</strong> : ${count} notif${count>1?'s':''} (${((count/total)*100).toFixed(1)}%)</div>`).join('');
+        const html = sorted.map(([app, count]) => `<div style="margin-bottom:8px;"><strong>${app}</strong> : ${count} notification${count>1?'s':''} (${((count/total)*100).toFixed(1)}%)</div>`).join('');
         document.getElementById('topAppsList').innerHTML = html || '<div>Aucune donnée</div>';
     } catch (err) { console.error(err); }
 }
@@ -412,7 +419,7 @@ function initChart() {
         type: 'bar',
         data: {
             labels: realScreenTimeData.labels,
-            datasets: [{ label: 'Heures', data: realScreenTimeData.daily, backgroundColor: '#667eea', borderRadius: 8 }]
+            datasets: [{ label: 'Temps d\'écran (heures)', data: realScreenTimeData.daily, backgroundColor: '#667eea', borderRadius: 8 }]
         },
         options: {
             responsive: true,
@@ -452,10 +459,14 @@ window.onload = () => {
     const token = localStorage.getItem('adminToken');
     if (token) {
         adminToken = token;
-        showDashboard();
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('dashboardScreen').style.display = 'block';
         setupNavigation();
         initChart();
         loadAllData();
+    } else {
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('dashboardScreen').style.display = 'none';
     }
 };
 
