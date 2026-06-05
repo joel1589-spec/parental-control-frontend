@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const API_URL = 'https://john-dbfu.onrender.com/api';  // ← le backend avec le préfixe /api
+const API_URL = 'https://john-dbfu.onrender.com/api';  // ← contient déjà /api
 let token = localStorage.getItem('ps_token') || null;
 let currentChildId = null;
 let currentPage = 'dashboard';
@@ -140,7 +140,7 @@ window.showPage = function(page) {
   currentPage = page;
   document.getElementById(`page-${page}`)?.classList.add('active');
   document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
-  const titles = { dashboard:'Dashboard', children:'Enfants', notifications:'Messages', rules:'Règles de blocage', location:'Localisation' };
+  const titles = { dashboard:'Dashboard', children:'Enfants', notifications:'Messages', rules:'Règles de blocage', location:'Localisation', settings:'Paramètres' };
   document.getElementById('page-title').textContent = titles[page] || page;
   const needChild = ['notifications','rules','location','dashboard'].includes(page);
   document.getElementById('child-selector-wrap').classList.toggle('hidden', !needChild);
@@ -163,9 +163,13 @@ async function loadDashboard() {
   const children = childrenData?.children || [];
   document.getElementById('stat-children').textContent = children.length;
 
-  const allRules = await api('GET', '/admin/rules/all') || [];
-  const activeRules = allRules.filter(r => r.is_active).length;
-  document.getElementById('stat-rules').textContent = activeRules;
+  // Récupération du nombre de règles actives (tous enfants confondus)
+  let activeRulesCount = 0;
+  for (const child of children) {
+    const rulesData = await api('GET', `/admin/rules/${child.id}`);
+    if (rulesData?.rules) activeRulesCount += rulesData.rules.filter(r => r.is_active).length;
+  }
+  document.getElementById('stat-rules').textContent = activeRulesCount;
 
   let unread = 0;
   if (currentChildId) {
@@ -258,7 +262,7 @@ function renderChildrenTable(children) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
           </button>
         </div>
-      </tr>`;
+      </td>`;
     tb.appendChild(tr);
   });
 }
@@ -384,11 +388,11 @@ async function loadRules() {
   const tb = document.getElementById('rules-tbody');
   if (!currentChildId) { tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Sélectionnez un enfant</div></td></tr>'; return; }
   const data = await api('GET', `/admin/rules/${currentChildId}`);
-  if (!data?.rules) { tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>'; return; }
+  if (!data?.rules) { tb.innerHTML='<td><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>'; return; }
   const rules = data.rules;
   tb.innerHTML = '';
   if (!rules.length) {
-    tb.innerHTML='<tr><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>';
+    tb.innerHTML='<td><td colspan="5"><div class="empty-state">Aucune règle</div></td></tr>';
     return;
   }
   const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
@@ -505,19 +509,19 @@ function closeModal() {
 }
 
 // ============================================================
-// RÉINITIALISER UNIQUEMENT LES MESSAGES
+// RÉINITIALISER UNIQUEMENT LES MESSAGES (correction de l'URL)
 // ============================================================
 async function resetMessages() {
   if (!confirm("⚠️ Êtes-vous sûr ?\n\nCette action supprimera TOUS les messages (notifications) de tous les enfants.\n\nLes enfants et les règles de blocage seront conservés.")) return;
 
   try {
-    const res = await fetch(`${API_URL}/api/admin/reset-messages`, {
+    // ICI : on n'ajoute PAS /api car API_URL le contient déjà
+    const res = await fetch(`${API_URL}/admin/reset-messages`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (res.ok) {
       alert("✅ Tous les messages ont été supprimés.");
-      // Recharger la page pour actualiser les listes
       location.reload();
     } else {
       const text = await res.text();
@@ -529,9 +533,6 @@ async function resetMessages() {
 }
 
 window.resetMessages = resetMessages;
-
-// Rendre la fonction globale
-window.resetAllData = resetAllData;
 
 // ============================================================
 // SIDEBAR
