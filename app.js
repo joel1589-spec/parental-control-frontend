@@ -1,10 +1,10 @@
 // ============================================================
 // CONFIGURATION
 // ============================================================
-const API_URL = 'https://john-dbfu.onrender.com/api';  // ← maintenant avec /api
+const API_URL = 'https://john-dbfu.onrender.com/api';  // ← le backend avec le préfixe /api
 let token = localStorage.getItem('ps_token') || null;
-let currentPage = 'dashboard';
 let currentChildId = null;
+let currentPage = 'dashboard';
 let chartInstance = null;
 
 // ============================================================
@@ -40,9 +40,9 @@ function showNetworkError() {
 }
 
 // ============================================================
-// AUTHENTIFICATION
+// AUTHENTIFICATION (globales)
 // ============================================================
-async function login() {
+window.login = async function() {
   const pw = document.getElementById('login-password').value;
   const btn = document.getElementById('btn-login');
   const err = document.getElementById('login-error');
@@ -59,18 +59,18 @@ async function login() {
     err.classList.remove('hidden');
     btn.style.opacity = '1'; btn.disabled = false;
   }
-}
+};
 
-function logout() {
+window.logout = function() {
   token = null;
   localStorage.removeItem('ps_token');
   document.getElementById('login-screen').classList.add('active');
   document.getElementById('app-screen').classList.remove('active');
   document.getElementById('login-password').value = '';
-}
+};
 
 document.getElementById('login-password')?.addEventListener('keydown', e => {
-  if (e.key === 'Enter') login();
+  if (e.key === 'Enter') window.login();
 });
 
 // ============================================================
@@ -93,7 +93,6 @@ async function loadChildren() {
     last_seen: c.last_seen,
     screen_time: c.screen_time || 0
   }));
-  // Mettre à jour le selecteur
   const sel = document.getElementById('child-selector');
   if (sel) {
     sel.innerHTML = '<option value="">— Enfant —</option>';
@@ -108,10 +107,8 @@ async function loadChildren() {
       sel.value = currentChildId;
     }
   }
-  // Mettre à jour le badge dans la sidebar
   const onlineCount = children.filter(c => c.online).length;
   setBadge('nav-badge-children', onlineCount);
-  // Afficher le tableau
   renderChildrenTable(children);
   return children;
 }
@@ -129,15 +126,15 @@ function setBadge(id, n) {
   else el.classList.remove('show');
 }
 
-function onChildChange() {
+window.onChildChange = function() {
   currentChildId = document.getElementById('child-selector').value || null;
   refreshPage();
-}
+};
 
 // ============================================================
 // PAGES & NAVIGATION
 // ============================================================
-function showPage(page) {
+window.showPage = function(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   currentPage = page;
@@ -149,30 +146,27 @@ function showPage(page) {
   document.getElementById('child-selector-wrap').classList.toggle('hidden', !needChild);
   refreshPage();
   if (window.innerWidth <= 768) closeSidebar();
-}
+};
 
 function refreshPage() {
   if (currentPage === 'dashboard') loadDashboard();
   else if (currentPage === 'notifications') loadNotifications();
   else if (currentPage === 'rules') loadRules();
-  else if (currentPage === 'location') document.getElementById('loc-meta').innerHTML = '<span class="loc-chip">📍 Localisation non disponible sur cette version</span>';
+  else if (currentPage === 'location') document.getElementById('loc-meta').innerHTML = '<span class="loc-chip">📍 Localisation non disponible</span>';
 }
 
 // ============================================================
 // DASHBOARD
 // ============================================================
 async function loadDashboard() {
-  // Enfants
   const childrenData = await api('GET', '/admin/children');
   const children = childrenData?.children || [];
   document.getElementById('stat-children').textContent = children.length;
 
-  // Règles actives (tous enfants confondus, on prend toutes les règles)
   const allRules = await api('GET', '/admin/rules/all') || [];
   const activeRules = allRules.filter(r => r.is_active).length;
   document.getElementById('stat-rules').textContent = activeRules;
 
-  // Notifications non lues (si enfant sélectionné)
   let unread = 0;
   if (currentChildId) {
     const notifs = await api('GET', `/admin/children/${currentChildId}/notifications?limit=100`);
@@ -181,12 +175,10 @@ async function loadDashboard() {
   document.getElementById('stat-unread').textContent = unread;
   setBadge('nav-badge-notif', unread);
 
-  // Temps d'écran
   const child = children.find(c => c.id === currentChildId);
   const screenSec = child?.screen_time || 0;
   document.getElementById('stat-screen-time').textContent = fmtDuration(screenSec);
 
-  // Graphique (basé sur les notifications des 7 derniers jours)
   if (currentChildId) loadChartData();
 }
 
@@ -266,12 +258,12 @@ function renderChildrenTable(children) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
           </button>
         </div>
-      </td>`;
+      </tr>`;
     tb.appendChild(tr);
   });
 }
 
-function showAddChild() {
+window.showAddChild = function() {
   openModal(`
     <div class="modal-title">Ajouter un enfant</div>
     <div class="form-row">
@@ -280,9 +272,9 @@ function showAddChild() {
     </div>
     <button class="modal-btn" onclick="createChild()">Générer le code d'appairage</button>
   `);
-}
+};
 
-async function createChild() {
+window.createChild = async function() {
   const name = document.getElementById('new-child-name')?.value.trim();
   if (!name) return;
   try {
@@ -292,16 +284,15 @@ async function createChild() {
     await loadChildren();
     showPairingModal(data.pairingCode, name, data.expiresIn);
   } catch(e) { alert(e.message); }
-}
+};
 
-async function showPairingCode(childId, childName) {
+window.showPairingCode = async function(childId, childName) {
   const data = await api('POST', '/pairing/generate', { deviceName: childName });
   if (!data) return;
   showPairingModal(data.pairingCode, childName, data.expiresIn);
-}
+};
 
 function showPairingModal(code, name, expiresIn) {
-  const expDate = new Date(Date.now() + 10*60*1000);
   openModal(`
     <div class="modal-title">Code d'appairage</div>
     <p style="color:var(--text-2);font-size:13px;margin-bottom:4px">Saisir ce code dans l'app Android pour <strong>${name}</strong> :</p>
@@ -310,16 +301,16 @@ function showPairingModal(code, name, expiresIn) {
   `);
 }
 
-async function deleteChild(id, name) {
+window.deleteChild = async function(id, name) {
   if (!confirm(`Supprimer ${name} ? Toutes ses données seront perdues.`)) return;
   await api('DELETE', `/admin/children/${id}`);
   await loadChildren();
   if (currentChildId === id) currentChildId = null;
   refreshPage();
-}
+};
 
 // ============================================================
-// NOTIFICATIONS (regroupées par contact)
+// NOTIFICATIONS
 // ============================================================
 async function loadNotifications() {
   const container = document.getElementById('convs-list');
@@ -329,7 +320,6 @@ async function loadNotifications() {
   const notifs = data.notifications;
   if (!notifs.length) { container.innerHTML = '<div class="empty-state">Aucun message</div>'; return; }
 
-  // Regroupement par contact (champ title)
   const groups = new Map();
   notifs.forEach(n => {
     const contact = n.title || 'Inconnu';
@@ -370,12 +360,12 @@ async function loadNotifications() {
   }
 }
 
-function toggleConv(header) {
+window.toggleConv = function(header) {
   const card = header.parentElement;
   card.classList.toggle('open');
-}
+};
 
-async function markAllRead() {
+window.markAllRead = async function() {
   if (!currentChildId) return;
   const data = await api('GET', `/admin/children/${currentChildId}/notifications?limit=200`);
   if (data?.notifications) {
@@ -385,10 +375,10 @@ async function markAllRead() {
   }
   loadNotifications();
   loadDashboard();
-}
+};
 
 // ============================================================
-// RÈGLES DE BLOCAGE
+// RÈGLES
 // ============================================================
 async function loadRules() {
   const tb = document.getElementById('rules-tbody');
@@ -414,12 +404,12 @@ async function loadRules() {
           <button class="btn-icon" onclick="editRule(${r.id})">✏️</button>
           <button class="btn-icon danger" onclick="deleteRule(${r.id})">🗑️</button>
         </div>
-      </tr>`;
+      </td>`;
     tb.appendChild(tr);
   }
 }
 
-function showAddRule() {
+window.showAddRule = function() {
   if (!currentChildId) return alert('Sélectionnez un enfant d\'abord');
   openModal(`
     <div class="modal-title">Ajouter une règle</div>
@@ -439,10 +429,9 @@ function showAddRule() {
     <div class="form-row"><label class="form-check"><input type="checkbox" id="r-active" checked/> Règle active</label></div>
     <button class="modal-btn" onclick="createRule()">Créer la règle</button>
   `);
-}
+};
 
-function editRule(ruleId) {
-  // On recharge les règles pour trouver la règle
+window.editRule = function(ruleId) {
   fetch(`${API_URL}/admin/rules/${currentChildId}`, { headers: { Authorization: `Bearer ${token}` } })
     .then(r => r.json())
     .then(data => {
@@ -465,7 +454,7 @@ function editRule(ruleId) {
         <button class="modal-btn" onclick="updateRule(${rule.id})">Enregistrer</button>
       `);
     });
-}
+};
 
 function getRuleFromForm() {
   return {
@@ -479,7 +468,7 @@ function getRuleFromForm() {
   };
 }
 
-async function createRule() {
+window.createRule = async function() {
   if (!currentChildId) return;
   const body = { ...getRuleFromForm(), childId: currentChildId };
   try {
@@ -487,25 +476,25 @@ async function createRule() {
     closeModal();
     loadRules();
   } catch(e) { alert(e.message); }
-}
+};
 
-async function updateRule(ruleId) {
+window.updateRule = async function(ruleId) {
   const body = getRuleFromForm();
   try {
     await api('PUT', `/admin/rules/${ruleId}`, body);
     closeModal();
     loadRules();
   } catch(e) { alert(e.message); }
-}
+};
 
-async function deleteRule(ruleId) {
+window.deleteRule = async function(ruleId) {
   if (!confirm('Supprimer cette règle ?')) return;
   await api('DELETE', `/admin/rules/${ruleId}`);
   loadRules();
-}
+};
 
 // ============================================================
-// MODAL UTILITIES
+// MODAL
 // ============================================================
 function openModal(html) {
   document.getElementById('modal-body').innerHTML = html;
@@ -516,16 +505,16 @@ function closeModal() {
 }
 
 // ============================================================
-// SIDEBAR (mobile)
+// SIDEBAR
 // ============================================================
-function openSidebar() {
+window.openSidebar = function() {
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebar-overlay').classList.add('open');
-}
-function closeSidebar() {
+};
+window.closeSidebar = function() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebar-overlay').classList.remove('open');
-}
+};
 
 // ============================================================
 // UTILS
