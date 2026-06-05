@@ -2,97 +2,93 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Parental Control Pro</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div class="app">
-        <!-- Écran de connexion -->
-        <div id="loginScreen" class="screen active">
-            <div class="login-container">
-                <div class="login-card">
-                    <div class="logo">🛡️</div>
-                    <h1>Parental Control</h1>
-                    <p>Interface parent</p>
-                    <input type="password" id="adminPassword" placeholder="Mot de passe">
-                    <button onclick="login()">Se connecter</button>
-                </div>
-            </div>
+    <!-- Écran de connexion -->
+    <div id="loginScreen" style="display: flex; align-items: center; justify-content: center; height: 100vh;">
+        <div class="login-card">
+            <h1>Parental Control</h1>
+            <input type="password" id="adminPassword" placeholder="Mot de passe">
+            <button onclick="login()">Se connecter</button>
+        </div>
+    </div>
+
+    <!-- Dashboard principal -->
+    <div id="dashboardScreen" style="display: none;">
+        <div class="top-bar">
+            <button class="menu-toggle" id="menuToggle">☰</button>
+            <h2 id="pageTitle">Tableau de bord</h2>
+            <select id="childSelect" onchange="onChildSelect()">
+                <option value="">Sélectionner un enfant</option>
+            </select>
+            <button id="actionButton" onclick="showAddChildModal()">+ Ajouter un enfant</button>
         </div>
 
-        <!-- Dashboard principal -->
-        <div id="dashboardScreen" class="screen">
-            <!-- Menu hamburger pour mobile -->
-            <div class="top-bar">
-                <button class="menu-toggle" id="menuToggle">☰</button>
-                <div class="page-title">
-                    <h2 id="pageTitle">Tableau de bord</h2>
-                    <p id="pageSubtitle">Supervision parentale</p>
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="nav-item" data-tab="dashboard">📊 Dashboard</div>
+            <div class="nav-item" data-tab="children">👶 Enfants</div>
+            <div class="nav-item" data-tab="rules">⏰ Règles</div>
+            <div class="nav-item" data-tab="notifications">📱 Notifications</div>
+            <div class="nav-item" onclick="logout()">🚪 Déconnexion</div>
+        </div>
+
+        <!-- Contenu principal -->
+        <div class="main-content">
+            <!-- Section Dashboard (visible par défaut) -->
+            <div id="childrenSection" class="section">
+                <div class="section-header">
+                    <h3>👶 Liste des enfants appairés</h3>
+                    <button onclick="showAddChildModal()">+ Nouvel enfant</button>
                 </div>
-                <div class="top-actions">
-                    <select id="childSelect" onchange="onChildSelect()">
-                        <option value="">Sélectionner un enfant</option>
-                    </select>
-                    <button id="actionButton" class="btn-primary" onclick="showAddChildModal()">+ Ajouter un enfant</button>
-                </div>
+                <div id="childrenList" class="children-list"></div>
+                <div><span id="totalChildren"></span> enfants</div>
             </div>
 
-            <!-- Sidebar (menu latéral) -->
-            <div class="sidebar" id="sidebar">
-                <div class="sidebar-header">
-                    <span class="logo-small">🛡️ Parental Pro</span>
+            <!-- Section Règles (cachée) -->
+            <div id="rulesSection" class="section" style="display:none;">
+                <div class="section-header">
+                    <h3>⏰ Règles de blocage</h3>
+                    <button onclick="showAddRuleModal()">+ Nouvelle règle</button>
                 </div>
-                <div class="sidebar-nav">
-                    <div class="nav-item" data-tab="dashboard">
-                        <span>📊</span> Dashboard
-                    </div>
-                    <div class="nav-item" data-tab="children">
-                        <span>👶</span> Enfants
-                    </div>
-                    <div class="nav-item" data-tab="rules">
-                        <span>⏰</span> Règles
-                    </div>
-                    <div class="nav-item" data-tab="notifications">
-                        <span>📱</span> Notifications
-                    </div>
-                </div>
-                <div class="sidebar-footer">
-                    <div class="nav-item" onclick="logout()">
-                        <span>🚪</span> Déconnexion
-                    </div>
-                </div>
+                <div id="rulesList" class="rules-list"></div>
             </div>
 
-            <!-- Contenu principal -->
-            <div class="main-content" id="mainContent">
-                <!-- Le contenu (stats, graphiques, listes) sera injecté par JavaScript -->
+            <!-- Section Notifications (cachée) -->
+            <div id="notificationsSection" class="section" style="display:none;">
+                <div class="section-header">
+                    <h3>📨 Flux de notifications</h3>
+                </div>
+                <div id="notificationsList" class="notifications-list"></div>
             </div>
         </div>
     </div>
 
-    <!-- Modals -->
-    <div id="addChildModal" class="modal">
+    <!-- Modal Ajout Enfant -->
+    <div id="addChildModal" class="modal" style="display:none;">
         <div class="modal-content">
             <span class="close" onclick="closeAddChildModal()">&times;</span>
             <h3>Ajouter un enfant</h3>
-            <input type="text" id="childDeviceName" placeholder="Nom de l'appareil" required>
-            <button onclick="generatePairingCode()">Générer un code d'appairage</button>
+            <input type="text" id="childDeviceName" placeholder="Nom de l'appareil">
+            <button onclick="generatePairingCode()">Générer un code</button>
         </div>
     </div>
 
-    <div id="pairingCodeModal" class="modal">
+    <!-- Modal Code d'appairage -->
+    <div id="pairingCodeModal" class="modal" style="display:none;">
         <div class="modal-content">
             <span class="close" onclick="closePairingCodeModal()">&times;</span>
             <h3>Code d'appairage</h3>
             <div id="pairingCodeDisplay" class="code-display">------</div>
-            <button onclick="copyPairingCode()">Copier le code</button>
-            <p class="hint">Valable 10 minutes</p>
+            <button onclick="copyPairingCode()">Copier</button>
         </div>
     </div>
 
-    <div id="ruleModal" class="modal">
+    <!-- Modal Règle -->
+    <div id="ruleModal" class="modal" style="display:none;">
         <div class="modal-content">
             <span class="close" onclick="closeRuleModal()">&times;</span>
             <h3 id="ruleModalTitle">Règle de blocage</h3>
@@ -104,27 +100,11 @@
             </select>
             <input type="time" id="ruleStart" required>
             <input type="time" id="ruleEnd" required>
-            <input type="text" id="ruleApp" placeholder="Nom du package (optionnel)">
+            <input type="text" id="ruleApp" placeholder="Package (optionnel)">
             <button onclick="submitRule()">Valider</button>
         </div>
     </div>
 
     <script src="app.js"></script>
-    <script>
-        // Menu toggle pour mobile
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        if (menuToggle) {
-            menuToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('open');
-            });
-        }
-        // Fermer le menu après clic sur un onglet
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', () => {
-                if (window.innerWidth <= 768) sidebar.classList.remove('open');
-            });
-        });
-    </script>
 </body>
 </html>

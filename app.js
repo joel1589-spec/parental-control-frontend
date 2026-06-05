@@ -275,3 +275,4 @@ window.onload = () => {
         document.getElementById('dashboardScreen').style.display = 'none';
     }
 };
+window.onChildSelect = function() { selectChild(document.getElementById("childSelect").value); };
